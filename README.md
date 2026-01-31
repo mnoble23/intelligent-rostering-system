@@ -20,10 +20,16 @@ Key features include:
 ## Project Status
 Work in progress.
 
-## Current Focus
-- Backend initialisation
-- API structure
-- Mock endpoints for development and testing
+## Currently Implemented
+- FastAPI backend initialised
+- Mock API endpoints for development and testing
+- Basic project folder structure
+
+## Next Steps
+- Refactor backend into modular structure
+- Add database integration
+- Replace mock endpoints with real data
+- Begin roster generation logic
 
 ## License
 This project is licensed under the MIT License.
