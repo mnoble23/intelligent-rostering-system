@@ -2,7 +2,7 @@
 Full-stack web application for generating optimised staff rosters based on availability and constraints using Python, PostgreSQL, and React.
 
 ## Tech Stack
-- **Backend:** Python, FastAPI (planned)
+- **Backend:** Python, FastAPI 
 - **Frontend:** React (planned)
 - **Database:** PostgreSQL (planned)
 - **Authentication:** JWT (planned)
@@ -19,6 +19,11 @@ Key features include:
 
 ## Project Status
 Work in progress.
+
+## Current Focus
+- Backend initialisation
+- API structure
+- Mock endpoints for development and testing
 
 ## License
 This project is licensed under the MIT License.
