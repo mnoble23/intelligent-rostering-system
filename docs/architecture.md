@@ -1,0 +1,2 @@
+# Intelligent Rostering System – Architecture
+This document will be used to describe the system architecture, backend folder structure, data flow, and planned features. Updates will be added as development progresses.
