@@ -21,3 +21,11 @@ def get_users():
             "role": "Manager"
         }
     ]
+
+@app.get("/availability")
+def get_availability():
+    return [
+        {"user_id": 1, "day": "Monday", "available": True},
+        {"user_id": 2, "day": "Monday", "available": False},
+        {"user_id": 1, "day": "Tuesday", "available": True}
+    ]
