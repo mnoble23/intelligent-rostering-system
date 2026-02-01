@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from datetime import time
+from typing import List
 
 class AvailabilityBase(BaseModel):
     user_id: int
@@ -9,6 +10,10 @@ class AvailabilityBase(BaseModel):
 
 class AvailabilityCreate(AvailabilityBase):
     pass
+
+
+class AvailabilityBulkCreate(BaseModel):
+    availabilities: List[AvailabilityCreate]
 
 class AvailabilityResponse(AvailabilityBase):
     id: int
