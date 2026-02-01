@@ -22,14 +22,16 @@ Work in progress.
 
 ## Currently Implemented
 - FastAPI backend initialised
-- Mock API endpoints for development and testing
-- Basic project folder structure
+- Modular backend folder structure
+- PostgreSQL database integrated
+- Availability validation checks
+- Endpoints to post availability entries (single and multiple)
 
 ## Next Steps
-- Refactor backend into modular structure
-- Add database integration
-- Replace mock endpoints with real data
 - Begin roster generation logic
+- Additional validation checks
+- Fully integrate PostgreSQL database
+- Begin frontend React dashboard
 
 ## License
 This project is licensed under the MIT License.
