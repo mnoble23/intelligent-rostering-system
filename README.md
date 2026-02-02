@@ -4,7 +4,7 @@ Full-stack web application for generating optimised staff rosters based on avail
 ## Tech Stack
 - **Backend:** Python, FastAPI 
 - **Frontend:** React (planned)
-- **Database:** PostgreSQL (planned)
+- **Database:** PostgreSQL 
 - **Authentication:** JWT (planned)
 - **Deployment:** Docker (planned)
 
@@ -42,7 +42,7 @@ Work in progress.
 - Shifts between 4 - 9 hours long
 - Business hours from 06:00 - 22:00
 
-**Future Upgrades**
+**Future Upgrades:**
 - Fair distribution of shifts between users
 - Maximum hours of work for each user
 - At least 1 manager on shift at any time
