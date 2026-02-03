@@ -1,4 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.services.availability_loader import load_weekly_availability
 
 router = APIRouter(
     prefix="/roster",
@@ -16,3 +20,7 @@ def get_roster():
             ]
         }
     ]
+
+@router.get("/debug/availability")
+def debug_availability(db: Session = Depends(get_db)):
+    return load_weekly_availability(db)
