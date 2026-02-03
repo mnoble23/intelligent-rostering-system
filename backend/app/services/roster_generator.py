@@ -56,3 +56,41 @@ def match_availability_to_shifts(
                 staffable_shifts[day].append(shift)
 
     return staffable_shifts
+
+def assign_staff_to_shifts(
+    staffable_shifts: Dict[int, List[Shift]],
+    min_staff_per_shift: int = MIN_STAFF_PER_SHIFT
+) -> Dict[int, List[Shift]]:
+    assigned_shifts: Dict[int, List[Shift]] = {}
+    user_daily_assignments: Dict[int, Dict[int, List[Shift]]] = {}
+
+    for day, shifts in staffable_shifts.items():
+        assigned_shifts[day] = []
+
+        for shift in shifts:
+            final_staff: List[int] = []
+
+            for user_id in shift.staff:
+                if user_id not in user_daily_assignments:
+                    user_daily_assignments[user_id] = {}
+                if day not in user_daily_assignments[user_id]:
+                    user_daily_assignments[user_id][day] = []
+
+                overlap = False
+                for assigned in user_daily_assignments[user_id][day]:
+                    if not (shift.end_time <= assigned.start_time or shift.start_time >= assigned.end_time):
+                        overlap = True
+                        break
+
+                if not overlap:
+                    final_staff.append(user_id)
+                    user_daily_assignments[user_id][day].append(shift)
+
+                if len(final_staff) >= min_staff_per_shift:
+                    break
+
+            if len(final_staff) >= min_staff_per_shift:
+                shift.staff = final_staff
+                assigned_shifts[day].append(shift)
+
+    return assigned_shifts
