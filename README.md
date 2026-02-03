@@ -26,12 +26,13 @@ Work in progress.
 - PostgreSQL database integrated
 - Availability validation checks
 - Endpoints to post availability entries (single and multiple)
+- Implemented initial roster generation logic (very basic so far)
 
 ## Next Steps
-- Begin roster generation logic
 - Additional validation checks
 - Fully integrate PostgreSQL database
 - Begin frontend React dashboard
+- Once frontend partially implemented, improve roster generation logic to adhere to all constraints (will be easier with better roster visualisation through frontend)
 
 ## Roster Generation Info
 **Constraints for initial version:**
@@ -39,7 +40,7 @@ Work in progress.
 - Adhere to user availability
 - No overlapping shifts for a user
 - Minimum 2 staff working at a time
-- Shifts between 4 - 9 hours long
+- Shifts between 4 - 9 hours long (currently only does it in 4 hour blocks)
 - Business hours from 06:00 - 22:00
 
 **Future Upgrades:**

@@ -3,3 +3,9 @@
 - `GET /users` – Returns mock users for development
 - `GET /availability` - Returns mock availability for users
 - `GET /roster` - Returns mock roster for a user for a week
+- `POST /availability` - Creates a single availability entry
+- `POST /availability/bulk` - Creates multiple availability entries
+- `GET /roster/debug/availability` - Debug: loaded weekly availability
+- `GET /roster/debug/shifts` - Debug: generated weekly shifts
+- `GET /roster/debug/staffable-shifts` - Debug: shifts after applying availability
+- `GET /roster/debug/assigned-shifts` - Debug: shifts after assigning staff
