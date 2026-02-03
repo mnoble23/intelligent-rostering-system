@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.services.availability_loader import load_weekly_availability
-from app.services.roster_generator import generate_weekly_shifts
+from app.services.roster_generator import generate_weekly_shifts, match_availability_to_shifts
 
 router = APIRouter(
     prefix="/roster",
@@ -36,3 +36,24 @@ def debug_shifts():
     """
     weekly = generate_weekly_shifts()
     return {day: [f"{s.start_time}-{s.end_time}" for s in shifts] for day, shifts in weekly.items()}
+
+@router.get("/debug/staffable-shifts")
+def debug_staffable_shifts(db: Session = Depends(get_db)):
+    """
+    For debugging, will remove later.
+    """
+    availability_map = load_weekly_availability(db)
+    weekly_shifts = generate_weekly_shifts()
+    staffable = match_availability_to_shifts(availability_map, weekly_shifts)
+
+    return {
+        day: [
+            {
+                "start": s.start_time.strftime("%H:%M"),
+                "end": s.end_time.strftime("%H:%M"),
+                "staff": s.staff
+            }
+            for s in shifts
+        ]
+        for day, shifts in staffable.items()
+    }
