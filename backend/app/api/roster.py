@@ -23,4 +23,7 @@ def get_roster():
 
 @router.get("/debug/availability")
 def debug_availability(db: Session = Depends(get_db)):
+    """
+    For debugging, will remove later.
+    """
     return load_weekly_availability(db)
