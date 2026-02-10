@@ -1,6 +1,9 @@
 from dataclasses import dataclass, field
 from datetime import time
 from typing import Dict, List, Tuple
+from app.models.shift_db import ShiftDB
+from app.models.shift_assignment_db import ShiftAssignmentDB
+from sqlalchemy.orm import Session
 
 WeeklyAvailability = Dict[int, Dict[int, List[Tuple[time, time]]]]
 
@@ -58,9 +61,11 @@ def match_availability_to_shifts(
     return staffable_shifts
 
 def assign_staff_to_shifts(
+    db: Session,
     staffable_shifts: Dict[int, List[Shift]],
-    min_staff_per_shift: int = MIN_STAFF_PER_SHIFT
+    min_staff_per_shift: int = MIN_STAFF_PER_SHIFT,
 ) -> Dict[int, List[Shift]]:
+    
     assigned_shifts: Dict[int, List[Shift]] = {}
     user_daily_assignments: Dict[int, Dict[int, List[Shift]]] = {}
 
@@ -71,16 +76,12 @@ def assign_staff_to_shifts(
             final_staff: List[int] = []
 
             for user_id in shift.staff:
-                if user_id not in user_daily_assignments:
-                    user_daily_assignments[user_id] = {}
-                if day not in user_daily_assignments[user_id]:
-                    user_daily_assignments[user_id][day] = []
+                user_daily_assignments.setdefault(user_id, {}).setdefault(day, [])
 
-                overlap = False
-                for assigned in user_daily_assignments[user_id][day]:
-                    if not (shift.end_time <= assigned.start_time or shift.start_time >= assigned.end_time):
-                        overlap = True
-                        break
+                overlap = any(
+                    not (shift.end_time <= assigned.start_time or shift.start_time >= assigned.end_time)
+                    for assigned in user_daily_assignments[user_id][day]
+                )
 
                 if not overlap:
                     final_staff.append(user_id)
@@ -92,5 +93,37 @@ def assign_staff_to_shifts(
             if len(final_staff) >= min_staff_per_shift:
                 shift.staff = final_staff
                 assigned_shifts[day].append(shift)
+
+                db_shift = (
+                    db.query(ShiftDB)
+                    .filter_by(
+                        day_of_week=shift.day_of_week,
+                        start_time=shift.start_time,
+                        end_time=shift.end_time,
+                    )
+                    .first()
+                )
+                if not db_shift:
+                    db_shift = ShiftDB(
+                        day_of_week=shift.day_of_week,
+                        start_time=shift.start_time,
+                        end_time=shift.end_time,
+                    )
+                    db.add(db_shift)
+                    db.commit()
+                    db.refresh(db_shift)
+
+                for uid in shift.staff:
+                    exists = (
+                        db.query(ShiftAssignmentDB)
+                        .filter_by(shift_id=db_shift.id, user_id=uid)
+                        .first()
+                    )
+                    if not exists:
+                        db_assignment = ShiftAssignmentDB(
+                            shift_id=db_shift.id, user_id=uid
+                        )
+                        db.add(db_assignment)
+                db.commit()
 
     return assigned_shifts
