@@ -1,26 +1,18 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from typing import List, Dict
 
 from app.db.session import get_db
 from app.services.availability_loader import load_weekly_availability
 from app.services.roster_generator import generate_weekly_shifts, match_availability_to_shifts, assign_staff_to_shifts
+from app.models.shift_db import ShiftDB
+from app.models.shift_assignment_db import ShiftAssignmentDB
+from app.models.user_db import UserDB
 
 router = APIRouter(
     prefix="/roster",
     tags=["Roster"]
 )
-
-@router.get("/")
-def get_roster():
-    return [
-        {
-            "user_id": 1,
-            "week": "2026-02-03",
-            "shifts": [
-                {"day": "Monday", "hours": ["09:00-12:00", "14:00-18:00"]}
-            ]
-        }
-    ]
 
 @router.get("/debug/availability")
 def debug_availability(db: Session = Depends(get_db)):
@@ -95,3 +87,26 @@ def generate_roster(db: Session = Depends(get_db)):
     assign_staff_to_shifts(db, staffable_shifts)
 
     return {"status": "roster generated"}
+
+@router.get("/")
+def get_roster(db: Session = Depends(get_db)) -> List[Dict]:
+    shifts = db.query(ShiftDB).all()
+    roster = []
+
+    for shift in shifts:
+        assignments = db.query(ShiftAssignmentDB).filter_by(shift_id=shift.id).all()
+
+        staff = []
+        for a in assignments:
+            user = db.query(UserDB).get(a.user_id)
+            if user:
+                staff.append({"id": user.id, "name": user.name})
+
+        roster.append({
+            "day_of_week": shift.day_of_week,
+            "start_time": str(shift.start_time),
+            "end_time": str(shift.end_time),
+            "staff": staff
+        })
+
+    return roster
