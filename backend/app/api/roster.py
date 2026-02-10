@@ -82,3 +82,16 @@ def debug_assigned_shifts(db: Session = Depends(get_db)):
         ]
         for day, shifts in assigned_shifts.items()
     }
+
+@router.post("/generate")
+def generate_roster(db: Session = Depends(get_db)):
+    weekly_availability = load_weekly_availability(db)
+
+    weekly_shifts = generate_weekly_shifts()
+    staffable_shifts = match_availability_to_shifts(
+        weekly_availability,
+        weekly_shifts,
+    )
+    assign_staff_to_shifts(db, staffable_shifts)
+
+    return {"status": "roster generated"}
