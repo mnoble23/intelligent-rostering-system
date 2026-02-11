@@ -23,16 +23,15 @@ Work in progress.
 ## Currently Implemented
 - FastAPI backend initialised
 - Modular backend folder structure
-- PostgreSQL database integrated
 - Availability validation checks
 - Endpoints to post availability entries (single and multiple)
 - Implemented initial roster generation logic (very basic so far)
+- Database now fully integrated
 
 ## Next Steps
-- Additional validation checks
-- Fully integrate PostgreSQL database
 - Begin frontend React dashboard
 - Once frontend partially implemented, improve roster generation logic to adhere to all constraints (will be easier with better roster visualisation through frontend)
+- Also must change logic to ensure that roster generation is never duplicating shifts or any other issues
 
 ## Roster Generation Info
 **Constraints for initial version:**
