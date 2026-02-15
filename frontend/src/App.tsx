@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import API from "./services/api";
 import RosterTable from "./components/RosterTable";
 import UserAvailabilityForm from "./components/UserAvailabilityForm";
+import GenerateRoster from "./components/GenerateRoster";
 
 export default function App() {
   const [shifts, setShifts] = useState<any[]>([]);
@@ -23,7 +24,8 @@ export default function App() {
       {/* Navbar */}
       <nav style={{ padding: 10, borderBottom: "1px solid #ccc", marginBottom: 20 }}>
         <Link to="/" style={{ marginRight: 10 }}>Roster Dashboard</Link>
-        <Link to="/submit-availability">Submit Availability</Link>
+        <Link to="/submit-availability" style={{ marginRight: 10 }}>Submit Availability</Link>
+        <Link to="/generate-roster">Generate Roster</Link>
       </nav>
 
       {/* Routes */}
@@ -33,7 +35,11 @@ export default function App() {
 
         {/* Combined User + Availability Form */}
         <Route path="/submit-availability" element={<UserAvailabilityForm />} />
+
+        {/* Generate Roster Page */}
+        <Route path="/generate-roster" element={<GenerateRoster />} />
       </Routes>
     </Router>
   );
 }
+

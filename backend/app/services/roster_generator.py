@@ -66,6 +66,9 @@ def assign_staff_to_shifts(
     min_staff_per_shift: int = MIN_STAFF_PER_SHIFT,
 ) -> Dict[int, List[Shift]]:
     
+    db.query(ShiftAssignmentDB).delete()  
+    db.query(ShiftDB).delete()            
+    db.commit()
     assigned_shifts: Dict[int, List[Shift]] = {}
     user_daily_assignments: Dict[int, Dict[int, List[Shift]]] = {}
 
