@@ -37,9 +37,11 @@ export default function App() {
         <Route path="/submit-availability" element={<UserAvailabilityForm />} />
 
         {/* Generate Roster Page */}
-        <Route path="/generate-roster" element={<GenerateRoster />} />
+        <Route
+          path="/generate-roster"
+          element={<GenerateRoster refreshRoster={fetchRoster} />} 
+        />
       </Routes>
     </Router>
   );
 }
-

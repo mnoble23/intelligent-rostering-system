@@ -2,7 +2,7 @@ import API from "../services/api";
 import { useState } from "react";
 
 interface GenerateRosterProps {
-  refreshRoster?: () => void;
+  refreshRoster?: () => void; 
 }
 
 export default function GenerateRoster({ refreshRoster }: GenerateRosterProps) {
@@ -13,7 +13,9 @@ export default function GenerateRoster({ refreshRoster }: GenerateRosterProps) {
     try {
       await API.post("/roster/generate");
       setStatus("Roster generated successfully!");
-      if (refreshRoster) refreshRoster();
+      if (refreshRoster) {
+        refreshRoster(); 
+      }
     } catch (err) {
       console.error(err);
       setStatus("Failed to generate roster. Check console for details.");
