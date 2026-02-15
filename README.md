@@ -3,7 +3,7 @@ Full-stack web application for generating optimised staff rosters based on avail
 
 ## Tech Stack
 - **Backend:** Python, FastAPI 
-- **Frontend:** React (planned)
+- **Frontend:** React
 - **Database:** PostgreSQL 
 - **Authentication:** JWT (planned)
 - **Deployment:** Docker (planned)
@@ -27,9 +27,10 @@ Work in progress.
 - Endpoints to post availability entries (single and multiple)
 - Implemented initial roster generation logic (very basic so far)
 - Database now fully integrated
+- Connected React frontend with backend
 
 ## Next Steps
-- Begin frontend React dashboard
+- Add features to React app so that a user can submit availability and generate rosters
 - Once frontend partially implemented, improve roster generation logic to adhere to all constraints (will be easier with better roster visualisation through frontend)
 - Also must change logic to ensure that roster generation is never duplicating shifts or any other issues
 
