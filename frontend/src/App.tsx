@@ -1,34 +1,39 @@
+import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
+
 import API from "./services/api";
 import RosterTable from "./components/RosterTable";
+import UserAvailabilityForm from "./components/UserAvailabilityForm";
 
-interface Staff {
-  id: number;
-  name: string;
-}
+export default function App() {
+  const [shifts, setShifts] = useState<any[]>([]);
 
-interface ShiftAssignment {
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  staff: Staff[];
-}
-
-function App() {
-  const [shifts, setShifts] = useState<ShiftAssignment[]>([]);
-
-  useEffect(() => {
+  const fetchRoster = () => {
     API.get("/roster")
       .then(res => setShifts(res.data))
       .catch(err => console.error(err));
+  };
+
+  useEffect(() => {
+    fetchRoster();
   }, []);
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Roster Dashboard</h1>
-      <RosterTable shifts={shifts} />
-    </div>
+    <Router>
+      {/* Navbar */}
+      <nav style={{ padding: 10, borderBottom: "1px solid #ccc", marginBottom: 20 }}>
+        <Link to="/" style={{ marginRight: 10 }}>Roster Dashboard</Link>
+        <Link to="/submit-availability">Submit Availability</Link>
+      </nav>
+
+      {/* Routes */}
+      <Routes>
+        {/* Dashboard */}
+        <Route path="/" element={<RosterTable shifts={shifts} />} />
+
+        {/* Combined User + Availability Form */}
+        <Route path="/submit-availability" element={<UserAvailabilityForm />} />
+      </Routes>
+    </Router>
   );
 }
-
-export default App;
