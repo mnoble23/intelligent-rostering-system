@@ -28,9 +28,10 @@ Work in progress.
 - Implemented initial roster generation logic (very basic so far)
 - Database now fully integrated
 - Connected React frontend with backend
+- Added features to React app so that a user can submit availability and generate rosters
 
 ## Next Steps
-- Add features to React app so that a user can submit availability and generate rosters
+- Continue with the planned improvements to the frontend which can be seen below
 - Once frontend partially implemented, improve roster generation logic to adhere to all constraints (will be easier with better roster visualisation through frontend)
 - Also must change logic to ensure that roster generation is never duplicating shifts or any other issues
 
@@ -45,8 +46,30 @@ Work in progress.
 
 **Future Upgrades:**
 - Fair distribution of shifts between users
-- Maximum hours of work for each user
+- Maximum and minimum hours of work for each user
 - At least 1 manager on shift at any time
+
+## Frontend Info and Plans
+**Currently Implemented:** 
+- Simple roster table view of staffed shifts
+- Page for user submission and their availability
+- Generate Roster button
+
+**Planned Improvements:**
+- Page for manual adding and removal of a user from a shift
+- Better roster visualisation
+- A 'My Roster' page for a user to view their shifts for the week
+- Shift coverage view to show which shifts are not fully staffed
+- Profile page showing availability and shifts for a user
+- Upgrade user and availability submission form to update a user availability if already in the system
+- React app design also needs to be much improved to be more user friendly and nicer on the eye
+
+## Potential Future Upgrades
+- Role based access control
+- Allow for specific business operation times to be picked
+- Allow minimum and maximum number of staff per shift to be picked (with specific choices for given times on given days)
+- Scheduling breaks for each member of staff
+- Specific shift lengths for a business could be input rather than just the 4 or 9 hour blocks
 
 ## License
 This project is licensed under the MIT License.
