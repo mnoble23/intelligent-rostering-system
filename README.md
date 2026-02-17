@@ -20,6 +20,49 @@ Key features include:
 ## Project Status
 Work in progress.
 
+## How To Run
+
+### 1. Clone Repo
+```bash
+git clone https://github.com/mnoble23/intelligent-rostering-syst
+cd intelligent-rostering-system
+```
+
+### 2. Configure Backend with Database
+Create a `.env` file inside `backend/` and add your database connection string:
+
+```env
+DATABASE_URL=postgresql+psycopg2://<username>:<password>@<host>:<port>/<database_name>
+```
+
+### 3. Backend Setup (FastAPI)
+```bash
+cd backend
+python -m venv .venv
+source .venv/Scripts/activate 
+pip install -r requirements.txt
+pip install python-dotenv
+uvicorn app.main:app --reload
+```
+
+Backend runs at: `http://127.0.0.1:8000`
+
+### 4. Start the Frontend (React)
+In a second terminal:
+```bash
+cd frontend
+npm install
+npm start
+```
+
+Frontend runs at: `http://localhost:3000`
+
+### 5. Use the app
+- Open `http://localhost:3000`
+- Submit user availability
+- Generate a roster from the UI
+- View roster 
+
 ## Currently Implemented
 - FastAPI backend initialised
 - Modular backend folder structure
