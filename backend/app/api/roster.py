@@ -1,11 +1,19 @@
+from datetime import time
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Dict
+from typing import Dict, List, Set
 from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.services.availability_loader import load_weekly_availability
-from app.services.roster_generator import generate_weekly_shifts, match_availability_to_shifts, assign_staff_to_shifts
+from app.services.roster_generator import (
+    BUSINESS_END,
+    BUSINESS_START,
+    MIN_STAFF_PER_SHIFT,
+    assign_staff_to_shifts,
+    generate_weekly_shifts,
+    match_availability_to_shifts,
+)
 from app.models.shift_db import ShiftDB
 from app.models.shift_assignment_db import ShiftAssignmentDB
 from app.models.user_db import UserDB
@@ -62,13 +70,13 @@ def debug_assigned_shifts(db: Session = Depends(get_db)):
     For debugging, will remove later.
     """
     availability_map = load_weekly_availability(db)
-    
+
     weekly_shifts = generate_weekly_shifts()
-    
+
     staffable_shifts = match_availability_to_shifts(availability_map, weekly_shifts)
 
-    assigned_shifts = assign_staff_to_shifts(staffable_shifts)
-    
+    assigned_shifts = assign_staff_to_shifts(db, staffable_shifts)
+
     return {
         day: [
             {
@@ -117,6 +125,75 @@ def get_roster(db: Session = Depends(get_db)) -> List[Dict]:
         })
 
     return roster
+
+
+@router.get("/coverage")
+def get_shift_coverage(db: Session = Depends(get_db)):
+    shifts = db.query(ShiftDB).all()
+    assignments = db.query(ShiftAssignmentDB).all()
+
+    staff_by_shift: Dict[int, Set[int]] = {}
+    for assignment in assignments:
+        staff_by_shift.setdefault(assignment.shift_id, set()).add(assignment.user_id)
+
+    coverage = []
+    fully_staffed_hours = 0
+    understaffed_hours = 0
+    closed_hours = 0
+
+    for day in range(7):
+        day_slots = []
+        day_shifts = [shift for shift in shifts if shift.day_of_week == day]
+
+        for hour in range(BUSINESS_START, BUSINESS_END):
+            hour_start = time(hour=hour)
+            hour_end = time(hour=hour + 1)
+
+            active_shifts = [
+                shift for shift in day_shifts
+                if shift.start_time <= hour_start and shift.end_time >= hour_end
+            ]
+
+            required_staff = MIN_STAFF_PER_SHIFT if active_shifts else 0
+            assigned_staff_ids: Set[int] = set()
+            for shift in active_shifts:
+                assigned_staff_ids.update(staff_by_shift.get(shift.id, set()))
+
+            assigned_staff = len(assigned_staff_ids)
+
+            if required_staff == 0:
+                status = "closed"
+                closed_hours += 1
+            elif assigned_staff >= required_staff:
+                status = "fully_staffed"
+                fully_staffed_hours += 1
+            else:
+                status = "understaffed"
+                understaffed_hours += 1
+
+            day_slots.append({
+                "hour_start": f"{hour:02d}:00",
+                "hour_end": f"{hour + 1:02d}:00",
+                "required_staff": required_staff,
+                "assigned_staff": assigned_staff,
+                "status": status,
+            })
+
+        coverage.append({"day_of_week": day, "hours": day_slots})
+
+    return {
+        "business_hours": {
+            "start": f"{BUSINESS_START:02d}:00",
+            "end": f"{BUSINESS_END:02d}:00",
+        },
+        "minimum_staff_per_shift": MIN_STAFF_PER_SHIFT,
+        "summary": {
+            "fully_staffed_hours": fully_staffed_hours,
+            "understaffed_hours": understaffed_hours,
+            "closed_hours": closed_hours,
+        },
+        "coverage": coverage,
+    }
 
 
 @router.post("/assign")
