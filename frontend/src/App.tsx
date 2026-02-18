@@ -6,6 +6,7 @@ import RosterTable from "./components/RosterTable";
 import UserAvailabilityForm from "./components/UserAvailabilityForm";
 import GenerateRoster from "./components/GenerateRoster";
 import ManageShiftAssignments from "./components/ManageShiftAssignments";
+import MyRoster from "./components/MyRoster";
 
 interface DashboardPageProps {
   shifts: any[];
@@ -40,7 +41,8 @@ export default function App() {
         <Link to="/" style={{ marginRight: 10 }}>Roster Dashboard</Link>
         <Link to="/submit-availability" style={{ marginRight: 10 }}>Submit Availability</Link>
         <Link to="/generate-roster" style={{ marginRight: 10 }}>Generate Roster</Link>
-        <Link to="/manage-shifts">Manage Shifts</Link>
+        <Link to="/manage-shifts" style={{ marginRight: 10 }}>Manage Shifts</Link>
+        <Link to="/my-roster">My Roster</Link>
       </nav>
 
       {/* Routes */}
@@ -58,6 +60,7 @@ export default function App() {
         />
 
         <Route path="/manage-shifts" element={<ManageShiftAssignments />} />
+        <Route path="/my-roster" element={<MyRoster />} />
       </Routes>
     </Router>
   );
