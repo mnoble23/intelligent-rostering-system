@@ -8,6 +8,7 @@ import GenerateRoster from "./components/GenerateRoster";
 import ManageShiftAssignments from "./components/ManageShiftAssignments";
 import MyRoster from "./components/MyRoster";
 import ShiftCoverage from "./components/ShiftCoverage";
+import MyProfile from "./components/MyProfile";
 
 interface DashboardPageProps {
   shifts: any[];
@@ -93,11 +94,13 @@ export default function App() {
             <Link to="/manage-shifts" style={{ marginRight: 10 }}>Manage Shifts</Link>
             <Link to="/submit-availability" style={{ marginRight: 10 }}>Submit Availability</Link>
             <Link to="/my-roster" style={{ marginRight: 10 }}>My Roster</Link>
+            <Link to="/my-profile" style={{ marginRight: 10 }}>My Profile</Link>
           </>
         ) : (
           <>
             <Link to="/" style={{ marginRight: 10 }}>Roster Dashboard</Link>
             <Link to="/my-roster" style={{ marginRight: 10 }}>My Roster</Link>
+            <Link to="/my-profile" style={{ marginRight: 10 }}>My Profile</Link>
             <Link to="/submit-availability" style={{ marginRight: 10 }}>Submit Availability</Link>
           </>
         )}
@@ -150,6 +153,14 @@ export default function App() {
           element={(
             <RoleGate role={role} allowedRoles={["manager", "staff"]}>
               <MyRoster />
+            </RoleGate>
+          )}
+        />
+        <Route
+          path="/my-profile"
+          element={(
+            <RoleGate role={role} allowedRoles={["manager", "staff"]}>
+              <MyProfile />
             </RoleGate>
           )}
         />
