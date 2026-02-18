@@ -5,19 +5,25 @@ interface Availability {
   day_of_week: number;
   start_time: string;
   end_time: string;
+  is_full_day: boolean;
 }
 
 export default function UserAvailabilityForm() {
+  const BUSINESS_OPEN = "06:00";
+  const BUSINESS_CLOSE = "22:00";
   const [name, setName] = useState("");
   const [availability, setAvailability] = useState<Availability[]>([
-    { day_of_week: 0, start_time: "", end_time: "" },
+    { day_of_week: 0, start_time: "", end_time: "", is_full_day: false },
   ]);
   const [status, setStatus] = useState("");
 
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   const addAvailability = () => {
-    setAvailability([...availability, { day_of_week: 0, start_time: "", end_time: "" }]);
+    setAvailability([
+      ...availability,
+      { day_of_week: 0, start_time: "", end_time: "", is_full_day: false },
+    ]);
   };
 
   const removeAvailability = (index: number) => {
@@ -29,6 +35,30 @@ export default function UserAvailabilityForm() {
         prev.map((av, i) =>
             i === index ? { ...av, [field]: value } : av
         )
+    );
+  };
+
+  const toggleFullDayAvailability = (index: number, isChecked: boolean) => {
+    setAvailability(prev =>
+      prev.map((av, i) => {
+        if (i !== index) return av;
+
+        if (isChecked) {
+          return {
+            ...av,
+            is_full_day: true,
+            start_time: BUSINESS_OPEN,
+            end_time: BUSINESS_CLOSE,
+          };
+        }
+
+        return {
+          ...av,
+          is_full_day: false,
+          start_time: "",
+          end_time: "",
+        };
+      })
     );
   };
 
@@ -69,7 +99,7 @@ export default function UserAvailabilityForm() {
 
       setStatus(`User "${name}" and availability submitted successfully!`);
       setName("");
-      setAvailability([{ day_of_week: 0, start_time: "", end_time: "" }]);
+      setAvailability([{ day_of_week: 0, start_time: "", end_time: "", is_full_day: false }]);
     } catch (err) {
       console.error(err);
       setStatus("Failed to submit. Check console for details.");
@@ -110,17 +140,28 @@ export default function UserAvailabilityForm() {
             ))}
           </select>
 
+          <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <input
+              type="checkbox"
+              checked={av.is_full_day}
+              onChange={e => toggleFullDayAvailability(i, e.target.checked)}
+            />
+            Fully Available
+          </label>
+
           <input
             type="time"
             value={av.start_time}
             onChange={e => updateAvailability(i, "start_time", e.target.value)}
             required
+            disabled={av.is_full_day}
           />
           <input
             type="time"
             value={av.end_time}
             onChange={e => updateAvailability(i, "end_time", e.target.value)}
             required
+            disabled={av.is_full_day}
           />
 
           {availability.length > 1 && (
