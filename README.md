@@ -71,12 +71,12 @@ Frontend runs at: `http://localhost:3000`
 - Implemented initial roster generation logic (very basic so far)
 - Database now fully integrated
 - Connected React frontend with backend
-- Added features to React app so that a user can submit availability and generate rosters
+- Added features to React app so that a user can submit availability, generate rosters, manually manage shifts and more
 
 ## Next Steps
-- Continue with the planned improvements to the frontend which can be seen below
-- Once frontend partially implemented, improve roster generation logic to adhere to all constraints (will be easier with better roster visualisation through frontend)
+- Improve roster generation logic so it takes more constraints into account
 - Also must change logic to ensure that roster generation is never duplicating shifts or any other issues
+- Improve react app to make it more user friendly
 
 ## Roster Generation Info
 **Constraints for initial version:**
@@ -102,11 +102,10 @@ Frontend runs at: `http://localhost:3000`
 - Changed roster table to a nicer design which is easier to read
 - Shift coverage page to see what times are understaffed
 - Manager and staff roles to determine what access they have in the app (at this point, you can just pick staff or manager without authentication)
+- My profile page added for a user to look at their info such as submitted availability and assigned shifts
 
 **Planned Improvements:**
 - Improve manual shift management to allow staff to have a custom shift start and end time
-- Profile page showing availability and shifts for a user
-- Upgrade user and availability submission form to update a user availability if already in the system
 - React app design also needs to be much improved to be more user friendly and nicer on the eye
 
 ## Potential Future Upgrades
