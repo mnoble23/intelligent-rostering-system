@@ -1,0 +1,160 @@
+.employee-calendar {
+  --ink: #18232f;
+  --muted: #576575;
+  --border: #d0dce7;
+  --header-bg: #eef4fa;
+  --surface: #ffffff;
+  --pill-bg: #e6f2ff;
+  --pill-border: #b7d4f3;
+  --pill-ink: #0b4d86;
+  --off-bg: #f3f5f7;
+  --off-ink: #7a8793;
+  color: var(--ink);
+  font-family: "Trebuchet MS", "Verdana", sans-serif;
+}
+
+.employee-calendar__header {
+  align-items: center;
+  background: linear-gradient(120deg, #f8fcff 0%, #eef4fa 52%, #f7fbf1 100%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 16px;
+}
+
+.employee-calendar__header h2 {
+  font-size: 1.45rem;
+  margin: 0;
+}
+
+.employee-calendar__header p {
+  color: var(--muted);
+  margin: 6px 0 0;
+}
+
+.employee-calendar__stats {
+  display: flex;
+  gap: 10px;
+}
+
+.employee-calendar__stats span {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+}
+
+.employee-calendar__stats strong {
+  font-size: 1rem;
+}
+
+.employee-calendar__empty {
+  color: var(--muted);
+  margin: 10px 0;
+}
+
+.employee-calendar__table-wrap {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow-x: auto;
+  padding: 8px;
+}
+
+.employee-calendar__table {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 880px;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.employee-calendar__table thead th {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid #dce6ef;
+  color: #24384d;
+  font-size: 0.82rem;
+  letter-spacing: 0.05em;
+  padding: 10px 8px;
+  text-transform: uppercase;
+}
+
+.employee-calendar__table thead th:first-child {
+  border-top-left-radius: 10px;
+  left: 0;
+  min-width: 180px;
+  position: sticky;
+  z-index: 3;
+}
+
+.employee-calendar__table thead th:last-child {
+  border-top-right-radius: 10px;
+}
+
+.employee-calendar__table tbody th,
+.employee-calendar__table tbody td {
+  border-bottom: 1px solid #dce4eb;
+  border-right: 1px solid #e6edf3;
+  min-height: 62px;
+  padding: 8px;
+  vertical-align: top;
+}
+
+.employee-calendar__table tbody tr:nth-child(even) td,
+.employee-calendar__table tbody tr:nth-child(even) th {
+  background: #fcfdff;
+}
+
+.employee-calendar__name-cell {
+  background: #f8fbfe;
+  font-size: 0.9rem;
+  font-weight: 700;
+  left: 0;
+  position: sticky;
+  z-index: 2;
+}
+
+.employee-calendar__shift-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.employee-calendar__shift-pill {
+  background: var(--pill-bg);
+  border: 1px solid var(--pill-border);
+  border-radius: 8px;
+  color: var(--pill-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 6px;
+}
+
+.employee-calendar__off {
+  background: var(--off-bg);
+  border: 1px dashed #c9d3dc;
+  border-radius: 7px;
+  color: var(--off-ink);
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 7px;
+}
+
+@media (max-width: 720px) {
+  .employee-calendar__header h2 {
+    font-size: 1.2rem;
+  }
+
+  .employee-calendar__header p {
+    font-size: 0.9rem;
+  }
+}
