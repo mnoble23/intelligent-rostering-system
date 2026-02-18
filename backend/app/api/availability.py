@@ -34,7 +34,7 @@ def create_availability(
             status_code=400,
             detail=f"Availability overlaps with existing entry on day {availability.day_of_week}"
         )
-    
+
     db_availability = AvailabilityDB(**availability.model_dump())
     db.add(db_availability)
     db.commit()
@@ -47,6 +47,13 @@ def create_availabilities_bulk(
     bulk: AvailabilityBulkCreate,
     db: Session = Depends(get_db)
 ):
+    if not bulk.availabilities:
+        raise HTTPException(status_code=400, detail="At least one availability entry is required")
+
+    user_ids = {entry.user_id for entry in bulk.availabilities}
+    db.query(AvailabilityDB).filter(AvailabilityDB.user_id.in_(user_ids)).delete(synchronize_session=False)
+    db.commit()
+
     created_entries = []
 
     for availability in bulk.availabilities:

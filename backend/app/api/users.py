@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.user_db import UserDB
@@ -22,7 +23,19 @@ def get_users(db: Session = Depends(get_db)):
 
 @router.post("/", response_model=UserRead)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = UserDB(name=user.name)
+    normalized_name = user.name.strip()
+    if not normalized_name:
+        raise HTTPException(status_code=400, detail="Name is required")
+
+    existing_user = (
+        db.query(UserDB)
+        .filter(func.lower(UserDB.name) == normalized_name.lower())
+        .first()
+    )
+    if existing_user:
+        return existing_user
+
+    db_user = UserDB(name=normalized_name)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
