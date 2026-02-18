@@ -97,12 +97,14 @@ Frontend runs at: `http://localhost:3000`
 - Simple roster table view of staffed shifts
 - Page for user submission and their availability
 - Generate Roster button
+- Manual shift management
+- My Roster page to show a user their roster for the week
+- Changed roster table to a nicer design which is easier to read
+- Shift coverage page to see what times are understaffed
+- Manager and staff roles to determine what access they have in the app (at this point, you can just pick staff or manager without authentication)
 
 **Planned Improvements:**
-- Page for manual adding and removal of a user from a shift
-- Better roster visualisation
-- A 'My Roster' page for a user to view their shifts for the week
-- Shift coverage view to show which shifts are not fully staffed
+- Improve manual shift management to allow staff to have a custom shift start and end time
 - Profile page showing availability and shifts for a user
 - Upgrade user and availability submission form to update a user availability if already in the system
 - React app design also needs to be much improved to be more user friendly and nicer on the eye
