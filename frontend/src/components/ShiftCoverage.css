@@ -76,12 +76,6 @@
   color: #8f3f18;
 }
 
-.coverage__legend-item--closed {
-  background: #f3f5f7;
-  border: 1px solid #c8d1db;
-  color: #67727d;
-}
-
 .coverage__days {
   display: grid;
   gap: 10px;
@@ -146,12 +140,6 @@
   background: #fff3e8;
   border: 1px solid #efb48f;
   color: #8a3f1a;
-}
-
-.coverage__block--closed {
-  background: #f4f6f8;
-  border: 1px dashed #c4ced9;
-  color: #65707b;
 }
 
 @media (max-width: 720px) {

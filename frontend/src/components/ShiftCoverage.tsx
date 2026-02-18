@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import API from "../services/api";
 import "./ShiftCoverage.css";
 
-type CoverageStatus = "fully_staffed" | "understaffed" | "closed";
+type CoverageStatus = "fully_staffed" | "understaffed";
 
 interface HourCoverage {
   hour_start: string;
@@ -26,7 +26,6 @@ interface CoverageResponse {
   summary: {
     fully_staffed_hours: number;
     understaffed_hours: number;
-    closed_hours: number;
   };
   coverage: DayCoverage[];
 }
@@ -43,8 +42,7 @@ function formatHourLabel(hourStr: string) {
 
 function statusLabel(status: CoverageStatus) {
   if (status === "fully_staffed") return "Fully staffed";
-  if (status === "understaffed") return "Understaffed";
-  return "Closed";
+  return "Understaffed";
 }
 
 export default function ShiftCoverage() {
@@ -82,10 +80,9 @@ export default function ShiftCoverage() {
           (acc, hour) => {
             if (hour.status === "fully_staffed") acc.fully += 1;
             if (hour.status === "understaffed") acc.under += 1;
-            if (hour.status === "closed") acc.closed += 1;
             return acc;
           },
-          { fully: 0, under: 0, closed: 0 }
+          { fully: 0, under: 0 }
         );
 
         return {
@@ -100,13 +97,12 @@ export default function ShiftCoverage() {
       <header className="coverage__header">
         <div>
           <h2>Shift Coverage</h2>
-          <p>Day strips show each hour as fully staffed, understaffed, or closed.</p>
+          <p>Day strips show each hour as fully staffed or understaffed.</p>
         </div>
         {data && (
           <div className="coverage__stats">
             <span><strong>{data.summary.fully_staffed_hours}</strong> fully staffed</span>
             <span><strong>{data.summary.understaffed_hours}</strong> understaffed</span>
-            <span><strong>{data.summary.closed_hours}</strong> closed</span>
           </div>
         )}
       </header>
@@ -124,7 +120,6 @@ export default function ShiftCoverage() {
           <div className="coverage__legend" aria-label="Coverage legend">
             <span className="coverage__legend-item coverage__legend-item--fully_staffed">Fully staffed</span>
             <span className="coverage__legend-item coverage__legend-item--understaffed">Understaffed</span>
-            <span className="coverage__legend-item coverage__legend-item--closed">Closed</span>
           </div>
 
           <div className="coverage__days">
@@ -133,7 +128,7 @@ export default function ShiftCoverage() {
                 <header className="coverage__day-header">
                   <h3>{days[day.day_of_week]}</h3>
                   <p>
-                    {day.totals.under} understaffed, {day.totals.fully} fully staffed, {day.totals.closed} closed
+                    {day.totals.under} understaffed, {day.totals.fully} fully staffed
                   </p>
                 </header>
 
@@ -143,12 +138,10 @@ export default function ShiftCoverage() {
                       key={`${day.day_of_week}-${hour.hour_start}`}
                       role="listitem"
                       className={`coverage__block coverage__block--${hour.status}`}
-                      title={`${days[day.day_of_week]} ${formatHourLabel(hour.hour_start)}-${formatHourLabel(hour.hour_end)}: ${statusLabel(hour.status)}${
-                        hour.status === "closed" ? "" : ` (${hour.assigned_staff}/${hour.required_staff} staff)`
-                      }`}
+                      title={`${days[day.day_of_week]} ${formatHourLabel(hour.hour_start)}-${formatHourLabel(hour.hour_end)}: ${statusLabel(hour.status)} (${hour.assigned_staff}/${hour.required_staff} staff)`}
                     >
                       <span>{formatHourLabel(hour.hour_start)}</span>
-                      {hour.status === "closed" ? <small>Closed</small> : <small>{hour.assigned_staff}/{hour.required_staff}</small>}
+                      <small>{hour.assigned_staff}/{hour.required_staff}</small>
                     </div>
                   ))}
                 </div>

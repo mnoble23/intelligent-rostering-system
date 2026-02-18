@@ -139,7 +139,6 @@ def get_shift_coverage(db: Session = Depends(get_db)):
     coverage = []
     fully_staffed_hours = 0
     understaffed_hours = 0
-    closed_hours = 0
 
     for day in range(7):
         day_slots = []
@@ -154,17 +153,14 @@ def get_shift_coverage(db: Session = Depends(get_db)):
                 if shift.start_time <= hour_start and shift.end_time >= hour_end
             ]
 
-            required_staff = MIN_STAFF_PER_SHIFT if active_shifts else 0
+            required_staff = MIN_STAFF_PER_SHIFT
             assigned_staff_ids: Set[int] = set()
             for shift in active_shifts:
                 assigned_staff_ids.update(staff_by_shift.get(shift.id, set()))
 
             assigned_staff = len(assigned_staff_ids)
 
-            if required_staff == 0:
-                status = "closed"
-                closed_hours += 1
-            elif assigned_staff >= required_staff:
+            if assigned_staff >= required_staff:
                 status = "fully_staffed"
                 fully_staffed_hours += 1
             else:
@@ -190,7 +186,7 @@ def get_shift_coverage(db: Session = Depends(get_db)):
         "summary": {
             "fully_staffed_hours": fully_staffed_hours,
             "understaffed_hours": understaffed_hours,
-            "closed_hours": closed_hours,
+            "closed_hours": 0,
         },
         "coverage": coverage,
     }
