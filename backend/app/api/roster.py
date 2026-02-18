@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Dict
+from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.services.availability_loader import load_weekly_availability
@@ -13,6 +14,11 @@ router = APIRouter(
     prefix="/roster",
     tags=["Roster"]
 )
+
+
+class ManualAssignmentUpdate(BaseModel):
+    shift_id: int
+    user_id: int
 
 @router.get("/debug/availability")
 def debug_availability(db: Session = Depends(get_db)):
@@ -103,6 +109,7 @@ def get_roster(db: Session = Depends(get_db)) -> List[Dict]:
                 staff.append({"id": user.id, "name": user.name})
 
         roster.append({
+            "id": shift.id,
             "day_of_week": shift.day_of_week,
             "start_time": str(shift.start_time),
             "end_time": str(shift.end_time),
@@ -110,3 +117,43 @@ def get_roster(db: Session = Depends(get_db)) -> List[Dict]:
         })
 
     return roster
+
+
+@router.post("/assign")
+def assign_user_to_shift(payload: ManualAssignmentUpdate, db: Session = Depends(get_db)):
+    shift = db.query(ShiftDB).filter_by(id=payload.shift_id).first()
+    if not shift:
+        raise HTTPException(status_code=404, detail="Shift not found")
+
+    user = db.query(UserDB).filter_by(id=payload.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    existing_assignment = db.query(ShiftAssignmentDB).filter_by(
+        shift_id=payload.shift_id,
+        user_id=payload.user_id,
+    ).first()
+    if existing_assignment:
+        raise HTTPException(status_code=400, detail="User already assigned to this shift")
+
+    assignment = ShiftAssignmentDB(shift_id=payload.shift_id, user_id=payload.user_id)
+    db.add(assignment)
+    db.commit()
+
+    return {"status": "user assigned to shift"}
+
+
+@router.post("/unassign")
+def unassign_user_from_shift(payload: ManualAssignmentUpdate, db: Session = Depends(get_db)):
+    assignment = db.query(ShiftAssignmentDB).filter_by(
+        shift_id=payload.shift_id,
+        user_id=payload.user_id,
+    ).first()
+
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    db.delete(assignment)
+    db.commit()
+
+    return {"status": "user removed from shift"}
