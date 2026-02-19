@@ -4,6 +4,8 @@ import API from "../services/api";
 interface User {
   id: number;
   name: string;
+  min_hours: number;
+  max_hours: number;
 }
 
 interface Availability {
@@ -137,6 +139,12 @@ export default function MyProfile() {
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
                 Name: <strong>{selectedUser?.name ?? "-"}</strong>
+              </span>
+              <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
+                Min Weekly Hours: <strong>{selectedUser?.min_hours ?? 0}</strong>
+              </span>
+              <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
+                Max Weekly Hours: <strong>{selectedUser?.max_hours ?? 40}</strong>
               </span>
               <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
                 Availability Entries: <strong>{userAvailability.length}</strong>

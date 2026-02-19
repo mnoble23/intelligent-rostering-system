@@ -12,6 +12,8 @@ export default function UserAvailabilityForm() {
   const BUSINESS_OPEN = "06:00";
   const BUSINESS_CLOSE = "22:00";
   const [name, setName] = useState("");
+  const [minHours, setMinHours] = useState(0);
+  const [maxHours, setMaxHours] = useState(40);
   const [availability, setAvailability] = useState<Availability[]>([
     { day_of_week: 0, start_time: "", end_time: "", is_full_day: false },
   ]);
@@ -70,6 +72,14 @@ export default function UserAvailabilityForm() {
       setStatus("Please enter a name.");
       return;
     }
+    if (minHours < 0 || maxHours < 0) {
+      setStatus("Minimum and maximum hours must be zero or greater.");
+      return;
+    }
+    if (maxHours < minHours) {
+      setStatus("Maximum hours must be greater than or equal to minimum hours.");
+      return;
+    }
 
     for (const av of availability) {
       if (!av.start_time || !av.end_time) {
@@ -83,7 +93,11 @@ export default function UserAvailabilityForm() {
     }
 
     try {
-      const userRes = await API.post("/users", { name });
+      const userRes = await API.post("/users", {
+        name,
+        min_hours: minHours,
+        max_hours: maxHours,
+      });
       const userId = userRes.data.id;
 
       const payload = {
@@ -99,6 +113,8 @@ export default function UserAvailabilityForm() {
 
       setStatus(`User "${name}" and availability submitted successfully!`);
       setName("");
+      setMinHours(0);
+      setMaxHours(40);
       setAvailability([{ day_of_week: 0, start_time: "", end_time: "", is_full_day: false }]);
     } catch (err) {
       console.error(err);
@@ -121,6 +137,30 @@ export default function UserAvailabilityForm() {
             onChange={e => setName(e.target.value)}
             required
             style={{ width: "100%", padding: 6 }}
+          />
+        </label>
+      </div>
+      <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+        <label>
+          Min Weekly Hours:{" "}
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            value={minHours}
+            onChange={e => setMinHours(Number(e.target.value))}
+            style={{ width: 110, padding: 6 }}
+          />
+        </label>
+        <label>
+          Max Weekly Hours:{" "}
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            value={maxHours}
+            onChange={e => setMaxHours(Number(e.target.value))}
+            style={{ width: 110, padding: 6 }}
           />
         </label>
       </div>
