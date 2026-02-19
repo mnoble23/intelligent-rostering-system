@@ -75,7 +75,12 @@ def debug_assigned_shifts(db: Session = Depends(get_db)):
 
     staffable_shifts = match_availability_to_shifts(availability_map, weekly_shifts)
 
-    assigned_shifts = assign_staff_to_shifts(db, staffable_shifts)
+    users = db.query(UserDB).all()
+    user_hour_limits = {
+        user.id: (float(user.min_hours), float(user.max_hours))
+        for user in users
+    }
+    assigned_shifts = assign_staff_to_shifts(db, staffable_shifts, user_hour_limits=user_hour_limits)
 
     return {
         day: [
@@ -98,7 +103,12 @@ def generate_roster(db: Session = Depends(get_db)):
         weekly_availability,
         weekly_shifts,
     )
-    assign_staff_to_shifts(db, staffable_shifts)
+    users = db.query(UserDB).all()
+    user_hour_limits = {
+        user.id: (float(user.min_hours), float(user.max_hours))
+        for user in users
+    }
+    assign_staff_to_shifts(db, staffable_shifts, user_hour_limits=user_hour_limits)
 
     return {"status": "roster generated"}
 

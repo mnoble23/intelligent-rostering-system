@@ -6,6 +6,7 @@ from app.models.shift_assignment_db import ShiftAssignmentDB
 from sqlalchemy.orm import Session
 
 WeeklyAvailability = Dict[int, Dict[int, List[Tuple[time, time]]]]
+UserHourLimits = Dict[int, Tuple[float, float]]
 
 BUSINESS_START = 6
 BUSINESS_END = 22
@@ -64,8 +65,23 @@ def assign_staff_to_shifts(
     db: Session,
     staffable_shifts: Dict[int, List[Shift]],
     min_staff_per_shift: int = MIN_STAFF_PER_SHIFT,
+    user_hour_limits: UserHourLimits | None = None,
 ) -> Dict[int, List[Shift]]:
-    
+    def shift_duration_hours(shift: Shift) -> float:
+        return (
+            (shift.end_time.hour * 60 + shift.end_time.minute)
+            - (shift.start_time.hour * 60 + shift.start_time.minute)
+        ) / 60.0
+
+    user_hour_limits = user_hour_limits or {}
+    user_assigned_hours: Dict[int, float] = {}
+    for shifts in staffable_shifts.values():
+        for shift in shifts:
+            for user_id in shift.staff:
+                user_assigned_hours.setdefault(user_id, 0.0)
+    for user_id in user_hour_limits:
+        user_assigned_hours.setdefault(user_id, 0.0)
+
     db.query(ShiftAssignmentDB).delete()  
     db.query(ShiftDB).delete()            
     db.commit()
@@ -77,18 +93,31 @@ def assign_staff_to_shifts(
 
         for shift in shifts:
             final_staff: List[int] = []
+            duration_hours = shift_duration_hours(shift)
 
-            for user_id in shift.staff:
+            sorted_candidates = sorted(
+                shift.staff,
+                key=lambda user_id: (
+                    0 if user_assigned_hours.get(user_id, 0.0) < user_hour_limits.get(user_id, (0.0, float("inf")))[0] else 1,
+                    user_assigned_hours.get(user_id, 0.0),
+                    user_id,
+                ),
+            )
+
+            for user_id in sorted_candidates:
                 user_daily_assignments.setdefault(user_id, {}).setdefault(day, [])
 
                 overlap = any(
                     not (shift.end_time <= assigned.start_time or shift.start_time >= assigned.end_time)
                     for assigned in user_daily_assignments[user_id][day]
                 )
+                _, max_hours = user_hour_limits.get(user_id, (0.0, float("inf")))
+                exceeds_max_hours = user_assigned_hours.get(user_id, 0.0) + duration_hours > max_hours
 
-                if not overlap:
+                if not overlap and not exceeds_max_hours:
                     final_staff.append(user_id)
                     user_daily_assignments[user_id][day].append(shift)
+                    user_assigned_hours[user_id] = user_assigned_hours.get(user_id, 0.0) + duration_hours
 
                 if len(final_staff) >= min_staff_per_shift:
                     break
