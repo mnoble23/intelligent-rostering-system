@@ -108,7 +108,10 @@ def assign_staff_to_shifts(
             sorted_candidates = sorted(
                 shift.staff,
                 key=lambda user_id: (
-                    0 if user_assigned_hours.get(user_id, 0.0) < user_hour_limits.get(user_id, (0.0, float("inf")))[0] else 1,
+                    -(
+                        user_hour_limits.get(user_id, (0.0, float("inf")))[1]
+                        - user_assigned_hours.get(user_id, 0.0)
+                    ),
                     user_assigned_hours.get(user_id, 0.0),
                     user_id,
                 ),
@@ -116,6 +119,7 @@ def assign_staff_to_shifts(
 
             for user_id in sorted_candidates:
                 user_daily_assignments.setdefault(user_id, {}).setdefault(day, [])
+                already_assigned_today = len(user_daily_assignments[user_id][day]) > 0
 
                 overlap = any(
                     not (shift.end_time <= assigned.start_time or shift.start_time >= assigned.end_time)
@@ -124,7 +128,7 @@ def assign_staff_to_shifts(
                 _, max_hours = user_hour_limits.get(user_id, (0.0, float("inf")))
                 exceeds_max_hours = user_assigned_hours.get(user_id, 0.0) + duration_hours > max_hours
 
-                if not overlap and not exceeds_max_hours:
+                if not already_assigned_today and not overlap and not exceeds_max_hours:
                     final_staff.append(user_id)
                     user_daily_assignments[user_id][day].append(shift)
                     user_assigned_hours[user_id] = user_assigned_hours.get(user_id, 0.0) + duration_hours
