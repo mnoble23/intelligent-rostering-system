@@ -41,7 +41,7 @@ def generate_weekly_shifts() -> Dict[int, List[Shift]]:
 def match_availability_to_shifts(
     weekly_availability: WeeklyAvailability,
     weekly_shifts: Dict[int, List[Shift]],
-    min_staff_per_shift: int = MIN_STAFF_PER_SHIFT
+    min_available_staff: int = 1,
 ) -> Dict[int, List[Shift]]:
     staffable_shifts: Dict[int, List[Shift]] = {}
 
@@ -57,7 +57,7 @@ def match_availability_to_shifts(
                         available_users.append(user_id)
                         break
 
-            if len(available_users) >= min_staff_per_shift:
+            if len(available_users) >= min_available_staff:
                 shift.staff = available_users
                 staffable_shifts[day].append(shift)
 
@@ -100,43 +100,78 @@ def assign_staff_to_shifts(
                 shift.end_time,
             ),
         )
+        available_candidates_by_shift = {
+            id(shift): list(shift.staff) for shift in ordered_shifts
+        }
+        assigned_staff_by_shift: Dict[int, List[int]] = {id(shift): [] for shift in ordered_shifts}
+        hourly_assigned_staff = {
+            hour: 0 for hour in range(BUSINESS_START, BUSINESS_END)
+        }
+
+        while True:
+            best_assignment: Tuple[Shift, int, float, int] | None = None
+            # (shift, user_id, duration_hours, coverage_gain)
+
+            for shift in ordered_shifts:
+                duration_hours = shift_duration_hours(shift)
+                sorted_candidates = sorted(
+                    available_candidates_by_shift[id(shift)],
+                    key=lambda user_id: (
+                        -(
+                            user_hour_limits.get(user_id, (0.0, float("inf")))[1]
+                            - user_assigned_hours.get(user_id, 0.0)
+                        ),
+                        user_assigned_hours.get(user_id, 0.0),
+                        user_id,
+                    ),
+                )
+
+                for user_id in sorted_candidates:
+                    user_daily_assignments.setdefault(user_id, {}).setdefault(day, [])
+                    already_assigned_today = len(user_daily_assignments[user_id][day]) > 0
+                    _, max_hours = user_hour_limits.get(user_id, (0.0, float("inf")))
+                    exceeds_max_hours = user_assigned_hours.get(user_id, 0.0) + duration_hours > max_hours
+
+                    if already_assigned_today or exceeds_max_hours:
+                        continue
+
+                    coverage_gain = sum(
+                        1
+                        for hour in range(shift.start_time.hour, shift.end_time.hour)
+                        if hourly_assigned_staff[hour] < min_staff_per_shift
+                    )
+                    if coverage_gain <= 0:
+                        continue
+
+                    if (
+                        best_assignment is None
+                        or coverage_gain > best_assignment[3]
+                        or (
+                            coverage_gain == best_assignment[3]
+                            and duration_hours > best_assignment[2]
+                        )
+                        or (
+                            coverage_gain == best_assignment[3]
+                            and duration_hours == best_assignment[2]
+                            and user_assigned_hours.get(user_id, 0.0)
+                            < user_assigned_hours.get(best_assignment[1], 0.0)
+                        )
+                    ):
+                        best_assignment = (shift, user_id, duration_hours, coverage_gain)
+
+            if best_assignment is None:
+                break
+
+            shift, user_id, duration_hours, _ = best_assignment
+            assigned_staff_by_shift[id(shift)].append(user_id)
+            user_daily_assignments[user_id][day].append(shift)
+            user_assigned_hours[user_id] = user_assigned_hours.get(user_id, 0.0) + duration_hours
+            for hour in range(shift.start_time.hour, shift.end_time.hour):
+                hourly_assigned_staff[hour] += 1
 
         for shift in ordered_shifts:
-            final_staff: List[int] = []
-            duration_hours = shift_duration_hours(shift)
-
-            sorted_candidates = sorted(
-                shift.staff,
-                key=lambda user_id: (
-                    -(
-                        user_hour_limits.get(user_id, (0.0, float("inf")))[1]
-                        - user_assigned_hours.get(user_id, 0.0)
-                    ),
-                    user_assigned_hours.get(user_id, 0.0),
-                    user_id,
-                ),
-            )
-
-            for user_id in sorted_candidates:
-                user_daily_assignments.setdefault(user_id, {}).setdefault(day, [])
-                already_assigned_today = len(user_daily_assignments[user_id][day]) > 0
-
-                overlap = any(
-                    not (shift.end_time <= assigned.start_time or shift.start_time >= assigned.end_time)
-                    for assigned in user_daily_assignments[user_id][day]
-                )
-                _, max_hours = user_hour_limits.get(user_id, (0.0, float("inf")))
-                exceeds_max_hours = user_assigned_hours.get(user_id, 0.0) + duration_hours > max_hours
-
-                if not already_assigned_today and not overlap and not exceeds_max_hours:
-                    final_staff.append(user_id)
-                    user_daily_assignments[user_id][day].append(shift)
-                    user_assigned_hours[user_id] = user_assigned_hours.get(user_id, 0.0) + duration_hours
-
-                if len(final_staff) >= min_staff_per_shift:
-                    break
-
-            if len(final_staff) >= min_staff_per_shift:
+            final_staff = assigned_staff_by_shift[id(shift)]
+            if final_staff:
                 shift.staff = final_staff
                 assigned_shifts[day].append(shift)
 
