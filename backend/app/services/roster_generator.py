@@ -84,14 +84,20 @@ def assign_staff_to_shifts(
     for user_id in user_hour_limits:
         user_assigned_hours.setdefault(user_id, 0.0)
 
-    db.query(ShiftAssignmentDB).delete()  
-    db.query(ShiftDB).delete()            
+    db.query(ShiftAssignmentDB).delete()
+    db.query(ShiftDB).delete()
     db.commit()
-    assigned_shifts: Dict[int, List[Shift]] = {}
+
+    assigned_shifts: Dict[int, List[Shift]] = {day: [] for day in range(7)}
     user_daily_assignments: Dict[int, Dict[int, List[Shift]]] = {}
+    ordered_shifts_by_day: Dict[int, List[Shift]] = {}
+    available_candidates_by_shift: Dict[int, List[int]] = {}
+    assigned_staff_by_shift: Dict[int, List[int]] = {}
+    hourly_assigned_staff_by_day: Dict[int, Dict[int, int]] = {}
+    shift_lookup_by_id: Dict[int, Shift] = {}
+    shift_day_by_id: Dict[int, int] = {}
 
     for day, shifts in staffable_shifts.items():
-        assigned_shifts[day] = []
         ordered_shifts = sorted(
             shifts,
             key=lambda shift: (
@@ -100,23 +106,64 @@ def assign_staff_to_shifts(
                 shift.end_time,
             ),
         )
-        available_candidates_by_shift = {
-            id(shift): list(shift.staff) for shift in ordered_shifts
-        }
-        assigned_staff_by_shift: Dict[int, List[int]] = {id(shift): [] for shift in ordered_shifts}
-        hourly_assigned_staff = {
+        ordered_shifts_by_day[day] = ordered_shifts
+        hourly_assigned_staff_by_day[day] = {
             hour: 0 for hour in range(BUSINESS_START, BUSINESS_END)
         }
+        for shift in ordered_shifts:
+            shift_id = id(shift)
+            shift_lookup_by_id[shift_id] = shift
+            shift_day_by_id[shift_id] = day
+            available_candidates_by_shift[shift_id] = list(shift.staff)
+            assigned_staff_by_shift[shift_id] = []
 
-        while True:
-            best_assignment: Tuple[Shift, int, float, int] | None = None
-            # (shift, user_id, duration_hours, coverage_gain)
+    def can_assign_user_to_shift(user_id: int, shift_id: int) -> bool:
+        shift = shift_lookup_by_id[shift_id]
+        day = shift_day_by_id[shift_id]
+        duration_hours = shift_duration_hours(shift)
+        user_daily_assignments.setdefault(user_id, {}).setdefault(day, [])
+        already_assigned_today = len(user_daily_assignments[user_id][day]) > 0
+        if already_assigned_today:
+            return False
 
+        _, max_hours = user_hour_limits.get(user_id, (0.0, float("inf")))
+        exceeds_max_hours = user_assigned_hours.get(user_id, 0.0) + duration_hours > max_hours
+        if exceeds_max_hours:
+            return False
+
+        if user_id in assigned_staff_by_shift[shift_id]:
+            return False
+
+        return True
+
+    def apply_assignment(user_id: int, shift_id: int) -> None:
+        shift = shift_lookup_by_id[shift_id]
+        day = shift_day_by_id[shift_id]
+        duration_hours = shift_duration_hours(shift)
+        assigned_staff_by_shift[shift_id].append(user_id)
+        user_daily_assignments.setdefault(user_id, {}).setdefault(day, []).append(shift)
+        user_assigned_hours[user_id] = user_assigned_hours.get(user_id, 0.0) + duration_hours
+        for hour in range(shift.start_time.hour, shift.end_time.hour):
+            hourly_assigned_staff_by_day[day][hour] += 1
+
+    # Phase 1: prioritize minimum coverage across business hours.
+    while True:
+        best_assignment: Tuple[int, int, float, int] | None = None
+        # (shift_id, user_id, duration_hours, coverage_gain)
+
+        for day, ordered_shifts in ordered_shifts_by_day.items():
+            hourly_assigned_staff = hourly_assigned_staff_by_day[day]
             for shift in ordered_shifts:
+                shift_id = id(shift)
                 duration_hours = shift_duration_hours(shift)
                 sorted_candidates = sorted(
-                    available_candidates_by_shift[id(shift)],
+                    available_candidates_by_shift[shift_id],
                     key=lambda user_id: (
+                        -max(
+                            0.0,
+                            user_hour_limits.get(user_id, (0.0, float("inf")))[0]
+                            - user_assigned_hours.get(user_id, 0.0),
+                        ),
                         -(
                             user_hour_limits.get(user_id, (0.0, float("inf")))[1]
                             - user_assigned_hours.get(user_id, 0.0)
@@ -127,12 +174,7 @@ def assign_staff_to_shifts(
                 )
 
                 for user_id in sorted_candidates:
-                    user_daily_assignments.setdefault(user_id, {}).setdefault(day, [])
-                    already_assigned_today = len(user_daily_assignments[user_id][day]) > 0
-                    _, max_hours = user_hour_limits.get(user_id, (0.0, float("inf")))
-                    exceeds_max_hours = user_assigned_hours.get(user_id, 0.0) + duration_hours > max_hours
-
-                    if already_assigned_today or exceeds_max_hours:
+                    if not can_assign_user_to_shift(user_id, shift_id):
                         continue
 
                     coverage_gain = sum(
@@ -157,55 +199,111 @@ def assign_staff_to_shifts(
                             < user_assigned_hours.get(best_assignment[1], 0.0)
                         )
                     ):
-                        best_assignment = (shift, user_id, duration_hours, coverage_gain)
+                        best_assignment = (shift_id, user_id, duration_hours, coverage_gain)
 
-            if best_assignment is None:
-                break
+        if best_assignment is None:
+            break
 
-            shift, user_id, duration_hours, _ = best_assignment
-            assigned_staff_by_shift[id(shift)].append(user_id)
-            user_daily_assignments[user_id][day].append(shift)
-            user_assigned_hours[user_id] = user_assigned_hours.get(user_id, 0.0) + duration_hours
-            for hour in range(shift.start_time.hour, shift.end_time.hour):
-                hourly_assigned_staff[hour] += 1
+        shift_id, user_id, _, _ = best_assignment
+        apply_assignment(user_id, shift_id)
 
+    # Phase 2: top up users who are still below minimum weekly hours.
+    while True:
+        users_below_min = [
+            user_id
+            for user_id, (min_hours, _) in user_hour_limits.items()
+            if user_assigned_hours.get(user_id, 0.0) < min_hours
+        ]
+        if not users_below_min:
+            break
+
+        progress = False
+        users_below_min.sort(
+            key=lambda user_id: (
+                -(
+                    user_hour_limits[user_id][0]
+                    - user_assigned_hours.get(user_id, 0.0)
+                ),
+                user_assigned_hours.get(user_id, 0.0),
+                user_id,
+            )
+        )
+
+        for user_id in users_below_min:
+            min_hours, _ = user_hour_limits[user_id]
+            remaining_hours = min_hours - user_assigned_hours.get(user_id, 0.0)
+            if remaining_hours <= 0:
+                continue
+
+            best_shift_id: int | None = None
+            best_score: Tuple[float, float, int] | None = None
+
+            for day, ordered_shifts in ordered_shifts_by_day.items():
+                for shift in ordered_shifts:
+                    shift_id = id(shift)
+                    if user_id not in available_candidates_by_shift[shift_id]:
+                        continue
+                    if not can_assign_user_to_shift(user_id, shift_id):
+                        continue
+
+                    duration_hours = shift_duration_hours(shift)
+                    overshoot = max(0.0, duration_hours - remaining_hours)
+                    score = (
+                        overshoot,
+                        -duration_hours,
+                        day,
+                    )
+                    if best_score is None or score < best_score:
+                        best_score = score
+                        best_shift_id = shift_id
+
+            if best_shift_id is not None:
+                apply_assignment(user_id, best_shift_id)
+                progress = True
+
+        if not progress:
+            break
+
+    for day, ordered_shifts in ordered_shifts_by_day.items():
         for shift in ordered_shifts:
             final_staff = assigned_staff_by_shift[id(shift)]
-            if final_staff:
-                shift.staff = final_staff
-                assigned_shifts[day].append(shift)
+            if not final_staff:
+                continue
 
-                db_shift = (
-                    db.query(ShiftDB)
-                    .filter_by(
-                        day_of_week=shift.day_of_week,
-                        start_time=shift.start_time,
-                        end_time=shift.end_time,
-                    )
+            shift.staff = final_staff
+            assigned_shifts[day].append(shift)
+
+            db_shift = (
+                db.query(ShiftDB)
+                .filter_by(
+                    day_of_week=shift.day_of_week,
+                    start_time=shift.start_time,
+                    end_time=shift.end_time,
+                )
+                .first()
+            )
+            if not db_shift:
+                db_shift = ShiftDB(
+                    day_of_week=shift.day_of_week,
+                    start_time=shift.start_time,
+                    end_time=shift.end_time,
+                )
+                db.add(db_shift)
+                db.commit()
+                db.refresh(db_shift)
+
+            for uid in shift.staff:
+                exists = (
+                    db.query(ShiftAssignmentDB)
+                    .filter_by(shift_id=db_shift.id, user_id=uid)
                     .first()
                 )
-                if not db_shift:
-                    db_shift = ShiftDB(
-                        day_of_week=shift.day_of_week,
-                        start_time=shift.start_time,
-                        end_time=shift.end_time,
+                if not exists:
+                    db_assignment = ShiftAssignmentDB(
+                        shift_id=db_shift.id, user_id=uid
                     )
-                    db.add(db_shift)
-                    db.commit()
-                    db.refresh(db_shift)
-
-                for uid in shift.staff:
-                    exists = (
-                        db.query(ShiftAssignmentDB)
-                        .filter_by(shift_id=db_shift.id, user_id=uid)
-                        .first()
-                    )
-                    if not exists:
-                        db_assignment = ShiftAssignmentDB(
-                            shift_id=db_shift.id, user_id=uid
-                        )
-                        db.add(db_assignment)
-                db.commit()
+                    db.add(db_assignment)
+            db.commit()
 
         assigned_shifts[day].sort(key=lambda shift: (shift.start_time, shift.end_time))
 
