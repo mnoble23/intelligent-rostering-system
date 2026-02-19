@@ -10,7 +10,7 @@ UserHourLimits = Dict[int, Tuple[float, float]]
 
 BUSINESS_START = 6
 BUSINESS_END = 22
-MIN_SHIFT_HOURS = 4
+ALLOWED_SHIFT_HOURS = (4, 6, 9)
 MIN_STAFF_PER_SHIFT = 2
 
 @dataclass
@@ -24,15 +24,17 @@ def generate_weekly_shifts() -> Dict[int, List[Shift]]:
     weekly_shifts: Dict[int, List[Shift]] = {}
     for day in range(7):
         shifts: List[Shift] = []
-        start_hour = BUSINESS_START
-        while start_hour + MIN_SHIFT_HOURS <= BUSINESS_END:
-            shift = Shift(
-                day_of_week=day,
-                start_time=time(hour=start_hour),
-                end_time=time(hour=min(start_hour + MIN_SHIFT_HOURS, BUSINESS_END))
-            )
-            shifts.append(shift)
-            start_hour += MIN_SHIFT_HOURS
+        for start_hour in range(BUSINESS_START, BUSINESS_END):
+            for duration_hours in ALLOWED_SHIFT_HOURS:
+                end_hour = start_hour + duration_hours
+                if end_hour > BUSINESS_END:
+                    continue
+                shift = Shift(
+                    day_of_week=day,
+                    start_time=time(hour=start_hour),
+                    end_time=time(hour=end_hour),
+                )
+                shifts.append(shift)
         weekly_shifts[day] = shifts
     return weekly_shifts
 
@@ -90,8 +92,16 @@ def assign_staff_to_shifts(
 
     for day, shifts in staffable_shifts.items():
         assigned_shifts[day] = []
+        ordered_shifts = sorted(
+            shifts,
+            key=lambda shift: (
+                -shift_duration_hours(shift),
+                shift.start_time,
+                shift.end_time,
+            ),
+        )
 
-        for shift in shifts:
+        for shift in ordered_shifts:
             final_staff: List[int] = []
             duration_hours = shift_duration_hours(shift)
 
@@ -157,5 +167,7 @@ def assign_staff_to_shifts(
                         )
                         db.add(db_assignment)
                 db.commit()
+
+        assigned_shifts[day].sort(key=lambda shift: (shift.start_time, shift.end_time))
 
     return assigned_shifts
