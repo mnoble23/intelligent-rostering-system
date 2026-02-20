@@ -79,41 +79,45 @@ Frontend runs at: `http://localhost:3000`
 - Improve react app to make it more user friendly
 
 ## Roster Generation Info
-**Constraints for initial version:**
-- Will be a weekly roster
-- Adhere to user availability
-- No overlapping shifts for a user
-- Minimum 2 staff working at a time
-- Shifts between 4 - 9 hours long (currently only does it in 4 hour blocks)
+**Current Version**
+- Creates a weekly roster adhering to user availability
+- No overlapping shifts for a user and only one shift per day
+- Ensures a minimum 2 staff working at a time with at least 1 manager at any time
+- Shifts can be 4, 6 or 9 hours long
 - Business hours from 06:00 - 22:00
 
 **Future Upgrades:**
-- Fair distribution of shifts between users
-- Maximum and minimum hours of work for each user
-- At least 1 manager on shift at any time
+- Maximum working days in a row
+- Include a minimum rest period between shifts
+- Add unit tests to ensure the roster is not violating any of the constraints
 
 ## Frontend Info and Plans
 **Currently Implemented:** 
-- Simple roster table view of staffed shifts
-- Page for user submission and their availability
+- Roster dashboard table to view full roster for the week
+- Page for user submission of their name, availability, min and max hours, role
 - Generate Roster button
 - Manual shift management
 - My Roster page to show a user their roster for the week
-- Changed roster table to a nicer design which is easier to read
 - Shift coverage page to see what times are understaffed
 - Manager and staff roles to determine what access they have in the app (at this point, you can just pick staff or manager without authentication)
-- My profile page added for a user to look at their info such as submitted availability and assigned shifts
+- My profile page added for a user to look at their info such as submitted availability and assigned shifts and min and max hours per week
 
 **Planned Improvements:**
 - Improve manual shift management to allow staff to have a custom shift start and end time
-- React app design also needs to be much improved to be more user friendly and nicer on the eye
+- React app design to be improved with better layout and nicer design
 
 ## Potential Future Upgrades
 - Role based access control
 - Allow for specific business operation times to be picked
 - Allow minimum and maximum number of staff per shift to be picked (with specific choices for given times on given days)
 - Scheduling breaks for each member of staff
-- Specific shift lengths for a business could be input rather than just the 4 or 9 hour blocks
+- Specific shift lengths for a business could be input rather than just the 4, 6 or 9 hour blocks
+- Allow for holidays to be put in so a user will not be included for that time period
+- Better fairness objective with night/weekends/unpopular shifts/number of extra hours
+- Skill based coverage
+- Let users rank preferred times
+- When roster generation fails, return exact reasons it has failed
+- A lot of these changes may require a change in roster generation approach, it is currently using a greedy heuristics type of model but may need to be changed to a constraint programming type of model with scoring and penalties
 
 ## License
 This project is licensed under the MIT License.
