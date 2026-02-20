@@ -20,6 +20,10 @@ with engine.begin() as connection:
         connection.execute(
             text('ALTER TABLE "user" ADD COLUMN max_hours FLOAT NOT NULL DEFAULT 40')
         )
+    if "role" not in user_columns:
+        connection.execute(
+            text('ALTER TABLE "user" ADD COLUMN role VARCHAR NOT NULL DEFAULT \'staff\'')
+        )
 
 app = FastAPI()
 

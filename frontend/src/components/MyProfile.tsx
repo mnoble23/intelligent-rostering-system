@@ -4,6 +4,7 @@ import API from "../services/api";
 interface User {
   id: number;
   name: string;
+  role: "manager" | "staff";
   min_hours: number;
   max_hours: number;
 }
@@ -139,6 +140,9 @@ export default function MyProfile() {
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
                 Name: <strong>{selectedUser?.name ?? "-"}</strong>
+              </span>
+              <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
+                Role: <strong>{selectedUser?.role ?? "staff"}</strong>
               </span>
               <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
                 Min Weekly Hours: <strong>{selectedUser?.min_hours ?? 0}</strong>

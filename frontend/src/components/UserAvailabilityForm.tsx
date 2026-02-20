@@ -12,6 +12,7 @@ export default function UserAvailabilityForm() {
   const BUSINESS_OPEN = "06:00";
   const BUSINESS_CLOSE = "22:00";
   const [name, setName] = useState("");
+  const [role, setRole] = useState<"staff" | "manager">("staff");
   const [minHours, setMinHours] = useState(0);
   const [maxHours, setMaxHours] = useState(40);
   const [availability, setAvailability] = useState<Availability[]>([
@@ -95,6 +96,7 @@ export default function UserAvailabilityForm() {
     try {
       const userRes = await API.post("/users", {
         name,
+        role,
         min_hours: minHours,
         max_hours: maxHours,
       });
@@ -113,6 +115,7 @@ export default function UserAvailabilityForm() {
 
       setStatus(`User "${name}" and availability submitted successfully!`);
       setName("");
+      setRole("staff");
       setMinHours(0);
       setMaxHours(40);
       setAvailability([{ day_of_week: 0, start_time: "", end_time: "", is_full_day: false }]);
@@ -138,6 +141,19 @@ export default function UserAvailabilityForm() {
             required
             style={{ width: "100%", padding: 6 }}
           />
+        </label>
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <label>
+          Role:{" "}
+          <select
+            value={role}
+            onChange={e => setRole(e.target.value as "staff" | "manager")}
+            style={{ width: "100%", padding: 6 }}
+          >
+            <option value="staff">Staff</option>
+            <option value="manager">Manager</option>
+          </select>
         </label>
       </div>
       <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
