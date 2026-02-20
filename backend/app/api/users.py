@@ -17,6 +17,7 @@ def get_users(db: Session = Depends(get_db)):
         {
             "id": user.id,
             "name": user.name,
+            "role": user.role,
             "min_hours": user.min_hours,
             "max_hours": user.max_hours,
         }
@@ -26,8 +27,11 @@ def get_users(db: Session = Depends(get_db)):
 @router.post("/", response_model=UserRead)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     normalized_name = user.name.strip()
+    normalized_role = user.role.strip().lower()
     if not normalized_name:
         raise HTTPException(status_code=400, detail="Name is required")
+    if normalized_role not in {"manager", "staff"}:
+        raise HTTPException(status_code=400, detail="role must be 'manager' or 'staff'")
     if user.max_hours < user.min_hours:
         raise HTTPException(status_code=400, detail="max_hours must be greater than or equal to min_hours")
 
@@ -37,6 +41,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
         .first()
     )
     if existing_user:
+        existing_user.role = normalized_role
         existing_user.min_hours = user.min_hours
         existing_user.max_hours = user.max_hours
         db.commit()
@@ -45,6 +50,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
     db_user = UserDB(
         name=normalized_name,
+        role=normalized_role,
         min_hours=user.min_hours,
         max_hours=user.max_hours,
     )
