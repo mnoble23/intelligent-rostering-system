@@ -80,7 +80,16 @@ def debug_assigned_shifts(db: Session = Depends(get_db)):
         user.id: (float(user.min_hours), float(user.max_hours))
         for user in users
     }
-    assigned_shifts = assign_staff_to_shifts(db, staffable_shifts, user_hour_limits=user_hour_limits)
+    user_roles = {
+        user.id: user.role
+        for user in users
+    }
+    assigned_shifts = assign_staff_to_shifts(
+        db,
+        staffable_shifts,
+        user_hour_limits=user_hour_limits,
+        user_roles=user_roles,
+    )
 
     return {
         day: [
@@ -108,7 +117,19 @@ def generate_roster(db: Session = Depends(get_db)):
         user.id: (float(user.min_hours), float(user.max_hours))
         for user in users
     }
-    assign_staff_to_shifts(db, staffable_shifts, user_hour_limits=user_hour_limits)
+    user_roles = {
+        user.id: user.role
+        for user in users
+    }
+    try:
+        assign_staff_to_shifts(
+            db,
+            staffable_shifts,
+            user_hour_limits=user_hour_limits,
+            user_roles=user_roles,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {"status": "roster generated"}
 
