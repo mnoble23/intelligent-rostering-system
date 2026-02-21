@@ -73,10 +73,12 @@ Frontend runs at: `http://localhost:3000`
 - Connected React frontend with backend
 - Added features to React app so that a user can submit availability, generate rosters, manually manage shifts and more
 - Simplistic but nice react app design for easy navigation and use
+- Rosters can be generated for multiple weeks
 
 ## Next Steps
-- Allow multiple rosters to be generated for different weeks
 - Role based access controls
+- Small improvements needed to make things like submitting availability less tedious
+- Subheadings for each page to separate things like roster generation and deletion from things like viewing 'My Profile' and 'My Roster' pages
 
 ## Roster Generation Info
 **Current Version**
@@ -105,6 +107,8 @@ Frontend runs at: `http://localhost:3000`
 
 **Planned Improvements:**
 - Role based access control
+- Small improvements needed to make things like submitting availability less tedious
+- Subheadings for each page to separate things like roster generation and deletion from things like viewing 'My Profile' and 'My Roster' pages
 
 ## Potential Future Upgrades
 - Allow for specific business operation times to be picked
