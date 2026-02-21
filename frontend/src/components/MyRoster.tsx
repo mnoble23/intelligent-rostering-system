@@ -22,6 +22,10 @@ interface Shift {
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+interface MyRosterProps {
+  weekStartDate?: string;
+}
+
 function formatTime(timeStr: string) {
   const [hour, minute] = timeStr.split(":").map(Number);
   const ampm = hour >= 12 ? "PM" : "AM";
@@ -29,7 +33,7 @@ function formatTime(timeStr: string) {
   return `${hour12}:${minute.toString().padStart(2, "0")} ${ampm}`;
 }
 
-export default function MyRoster() {
+export default function MyRoster({ weekStartDate }: MyRosterProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | "">("");
@@ -40,7 +44,10 @@ export default function MyRoster() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [usersRes, shiftsRes] = await Promise.all([API.get("/users"), API.get("/roster")]);
+        const [usersRes, shiftsRes] = await Promise.all([
+          API.get("/users"),
+          API.get("/roster", weekStartDate ? { params: { week_start_date: weekStartDate } } : undefined),
+        ]);
         setUsers(usersRes.data);
         setShifts(shiftsRes.data);
         setSelectedUserId("");
@@ -52,7 +59,7 @@ export default function MyRoster() {
     };
 
     loadData();
-  }, []);
+  }, [weekStartDate]);
 
   const myShifts = useMemo(() => {
     if (selectedUserId === "") return [];

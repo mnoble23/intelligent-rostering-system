@@ -33,6 +33,10 @@ interface Shift {
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+interface MyProfileProps {
+  weekStartDate?: string;
+}
+
 function parseHourValue(timeStr: string) {
   const [hour, minute] = timeStr.split(":").map(Number);
   return hour + minute / 60;
@@ -45,7 +49,7 @@ function formatTime(timeStr: string) {
   return `${hour12}:${minute.toString().padStart(2, "0")} ${ampm}`;
 }
 
-export default function MyProfile() {
+export default function MyProfile({ weekStartDate }: MyProfileProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -60,7 +64,7 @@ export default function MyProfile() {
         const [usersRes, availabilityRes, rosterRes] = await Promise.all([
           API.get("/users"),
           API.get("/availability"),
-          API.get("/roster"),
+          API.get("/roster", weekStartDate ? { params: { week_start_date: weekStartDate } } : undefined),
         ]);
 
         setUsers(usersRes.data);
@@ -75,7 +79,7 @@ export default function MyProfile() {
     };
 
     loadData();
-  }, []);
+  }, [weekStartDate]);
 
   const selectedUser = useMemo(
     () => users.find(user => user.id === selectedUserId) ?? null,

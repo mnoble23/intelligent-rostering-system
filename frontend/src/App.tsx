@@ -13,16 +13,11 @@ import MyProfile from "./components/MyProfile";
 
 interface DashboardPageProps {
   shifts: any[];
-  refreshRoster: () => void;
 }
 
 type AppRole = "manager" | "staff";
 
-function DashboardPage({ shifts, refreshRoster }: DashboardPageProps) {
-  useEffect(() => {
-    refreshRoster();
-  }, [refreshRoster]);
-
+function DashboardPage({ shifts }: DashboardPageProps) {
   return <RosterTable shifts={shifts} />;
 }
 
@@ -46,12 +41,32 @@ export default function App() {
     return saved === "manager" || saved === "staff" ? saved : null;
   });
   const [shifts, setShifts] = useState<any[]>([]);
+  const [availableWeeks, setAvailableWeeks] = useState<string[]>([]);
+  const [selectedWeek, setSelectedWeek] = useState<string>("");
 
   const fetchRoster = useCallback(() => {
-    API.get("/roster")
+    API.get("/roster", selectedWeek ? { params: { week_start_date: selectedWeek } } : undefined)
       .then(res => setShifts(res.data))
       .catch(err => console.error(err));
+  }, [selectedWeek]);
+
+  const fetchWeeks = useCallback(() => {
+    API.get<string[]>("/roster/weeks")
+      .then(res => {
+        const weeks = res.data ?? [];
+        setAvailableWeeks(weeks);
+        setSelectedWeek(current => {
+          if (weeks.length === 0) return "";
+          if (current && weeks.includes(current)) return current;
+          return weeks[0];
+        });
+      })
+      .catch(err => console.error(err));
   }, []);
+
+  useEffect(() => {
+    fetchWeeks();
+  }, [fetchWeeks]);
 
   useEffect(() => {
     fetchRoster();
@@ -121,6 +136,25 @@ export default function App() {
               </NavLink>
             ))}
           </nav>
+          <div className="app-sidebar__week-picker">
+            <label htmlFor="week-select">Roster Week</label>
+            <select
+              id="week-select"
+              value={selectedWeek}
+              onChange={event => setSelectedWeek(event.target.value)}
+              disabled={availableWeeks.length === 0}
+            >
+              {availableWeeks.length === 0 ? (
+                <option value="">No roster weeks</option>
+              ) : (
+                availableWeeks.map(week => (
+                  <option key={week} value={week}>
+                    {week}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
           <div className="app-sidebar__footer">
             <button type="button" className="app-sidebar__switch" onClick={clearRole}>
               Switch Role
@@ -134,7 +168,7 @@ export default function App() {
               path="/"
               element={(
                 <RoleGate role={role} allowedRoles={["manager", "staff"]}>
-                  <DashboardPage shifts={shifts} refreshRoster={fetchRoster} />
+                  <DashboardPage shifts={shifts} />
                 </RoleGate>
               )}
             />
@@ -142,7 +176,7 @@ export default function App() {
               path="/shift-coverage"
               element={(
                 <RoleGate role={role} allowedRoles={["manager"]}>
-                  <ShiftCoverage />
+                  <ShiftCoverage weekStartDate={selectedWeek || undefined} />
                 </RoleGate>
               )}
             />
@@ -158,7 +192,11 @@ export default function App() {
               path="/generate-roster"
               element={(
                 <RoleGate role={role} allowedRoles={["manager"]}>
-                  <GenerateRoster refreshRoster={fetchRoster} />
+                  <GenerateRoster
+                    refreshRoster={fetchRoster}
+                    refreshWeeks={fetchWeeks}
+                    startDate={selectedWeek || undefined}
+                  />
                 </RoleGate>
               )}
             />
@@ -166,7 +204,7 @@ export default function App() {
               path="/manage-shifts"
               element={(
                 <RoleGate role={role} allowedRoles={["manager"]}>
-                  <ManageShiftAssignments />
+                  <ManageShiftAssignments weekStartDate={selectedWeek || undefined} />
                 </RoleGate>
               )}
             />
@@ -174,7 +212,7 @@ export default function App() {
               path="/my-roster"
               element={(
                 <RoleGate role={role} allowedRoles={["manager", "staff"]}>
-                  <MyRoster />
+                  <MyRoster weekStartDate={selectedWeek || undefined} />
                 </RoleGate>
               )}
             />
@@ -182,7 +220,7 @@ export default function App() {
               path="/my-profile"
               element={(
                 <RoleGate role={role} allowedRoles={["manager", "staff"]}>
-                  <MyProfile />
+                  <MyProfile weekStartDate={selectedWeek || undefined} />
                 </RoleGate>
               )}
             />

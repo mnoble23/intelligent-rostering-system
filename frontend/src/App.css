@@ -57,6 +57,30 @@
   margin-top: auto;
 }
 
+.app-sidebar__week-picker {
+  display: grid;
+  gap: 6px;
+}
+
+.app-sidebar__week-picker label {
+  color: #9fb8d0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app-sidebar__week-picker select {
+  background: #f2f8ff;
+  border: 1px solid #c9d9ea;
+  border-radius: 10px;
+  color: #1f3b56;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 8px 10px;
+  width: 100%;
+}
+
 .app-sidebar__switch {
   background: #f2f8ff;
   border: 1px solid #c9d9ea;
@@ -103,6 +127,10 @@
 
   .app-sidebar__footer {
     margin-top: 2px;
+  }
+
+  .app-sidebar__week-picker select {
+    width: auto;
   }
 
   .app-sidebar__switch {

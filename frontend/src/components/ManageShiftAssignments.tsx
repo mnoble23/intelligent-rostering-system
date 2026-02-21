@@ -26,7 +26,11 @@ function toHHMM(timeStr: string) {
   return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
 }
 
-export default function ManageShiftAssignments() {
+interface ManageShiftAssignmentsProps {
+  weekStartDate?: string;
+}
+
+export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAssignmentsProps) {
   const [users, setUsers] = useState<EmployeeRow[]>([]);
   const [shifts, setShifts] = useState<ShiftAssignment[]>([]);
   const [selectedCell, setSelectedCell] = useState<{ userId: number; dayIndex: number } | null>(null);
@@ -38,7 +42,10 @@ export default function ManageShiftAssignments() {
 
   const loadData = async () => {
     try {
-      const [usersRes, shiftsRes] = await Promise.all([API.get("/users"), API.get("/roster")]);
+      const [usersRes, shiftsRes] = await Promise.all([
+        API.get("/users"),
+        API.get("/roster", weekStartDate ? { params: { week_start_date: weekStartDate } } : undefined),
+      ]);
       setUsers(usersRes.data.map((user: User) => ({ id: user.id, name: user.name })));
       setShifts(shiftsRes.data);
     } catch (err) {
@@ -49,7 +56,7 @@ export default function ManageShiftAssignments() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [weekStartDate]);
 
   const sortedShifts = useMemo(
     () =>
@@ -96,6 +103,7 @@ export default function ManageShiftAssignments() {
     if (!selectedCell) return null;
 
     const response = await API.post<ShiftUpsertResponse>("/roster/shifts/upsert", {
+      week_start_date: weekStartDate,
       day_of_week: selectedCell.dayIndex,
       start_time: startTime,
       end_time: endTime,

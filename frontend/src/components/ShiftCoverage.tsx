@@ -30,6 +30,10 @@ interface CoverageResponse {
   coverage: DayCoverage[];
 }
 
+interface ShiftCoverageProps {
+  weekStartDate?: string;
+}
+
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function formatHourLabel(hourStr: string) {
@@ -45,7 +49,7 @@ function statusLabel(status: CoverageStatus) {
   return "Understaffed";
 }
 
-export default function ShiftCoverage() {
+export default function ShiftCoverage({ weekStartDate }: ShiftCoverageProps) {
   const [data, setData] = useState<CoverageResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -54,7 +58,10 @@ export default function ShiftCoverage() {
     setLoading(true);
     setError("");
     try {
-      const response = await API.get<CoverageResponse>("/roster/coverage");
+      const response = await API.get<CoverageResponse>(
+        "/roster/coverage",
+        weekStartDate ? { params: { week_start_date: weekStartDate } } : undefined
+      );
       setData(response.data);
     } catch (err) {
       console.error(err);
@@ -62,7 +69,7 @@ export default function ShiftCoverage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [weekStartDate]);
 
   useEffect(() => {
     loadCoverage();
