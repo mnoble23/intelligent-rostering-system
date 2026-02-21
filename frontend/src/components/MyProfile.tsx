@@ -77,7 +77,7 @@ export default function MyProfile({ weekStartDate }: MyProfileProps) {
           API.get("/roster", weekStartDate ? { params: { week_start_date: weekStartDate } } : undefined),
         ]);
 
-        setUsers(usersRes.data);
+        setUsers([...usersRes.data].sort((a, b) => a.name.localeCompare(b.name)));
         setAvailability(availabilityRes.data);
         setShifts(rosterRes.data);
         setSelectedUserId("");
@@ -129,7 +129,7 @@ export default function MyProfile({ weekStartDate }: MyProfileProps) {
     const matches = query.length === 0
       ? users
       : users.filter(user => user.name.toLowerCase().includes(query));
-    return matches.slice(0, 12);
+    return matches;
   }, [users, userSearch]);
 
   return (
