@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import API from "../services/api";
+import "./MyProfile.css";
 
 interface User {
   id: number;
@@ -49,6 +50,8 @@ export default function MyProfile() {
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | "">("");
+  const [userSearch, setUserSearch] = useState("");
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -63,10 +66,8 @@ export default function MyProfile() {
         setUsers(usersRes.data);
         setAvailability(availabilityRes.data);
         setShifts(rosterRes.data);
-
-        if (usersRes.data.length > 0) {
-          setSelectedUserId(usersRes.data[0].id);
-        }
+        setSelectedUserId("");
+        setUserSearch("");
       } catch (err) {
         console.error(err);
         setStatus("Failed to load profile data.");
@@ -109,112 +110,142 @@ export default function MyProfile() {
     [userAvailability]
   );
 
+  const filteredUsers = useMemo(() => {
+    const query = userSearch.trim().toLowerCase();
+    const matches = query.length === 0
+      ? users
+      : users.filter(user => user.name.toLowerCase().includes(query));
+    return matches.slice(0, 12);
+  }, [users, userSearch]);
+
   return (
-    <div style={{ maxWidth: 920, margin: "20px auto" }}>
-      <h2>My Profile</h2>
-      {status && <p>{status}</p>}
+    <section className="my-profile">
+      <div className="my-profile__shell">
+        <header className="my-profile__hero">
+          <p className="my-profile__eyebrow">Profile Center</p>
+          <h2>My Profile</h2>
+          <p className="my-profile__lead">See profile settings, submitted availability, and current roster assignments.</p>
+        </header>
 
-      <div style={{ marginBottom: 16 }}>
-        <label>
-          User{" "}
-          <select
-            value={selectedUserId}
-            onChange={e => setSelectedUserId(Number(e.target.value))}
-            disabled={users.length === 0}
-          >
-            {users.map(user => (
-              <option key={user.id} value={user.id}>
-                {user.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+        {status && <p className="my-profile__status">{status}</p>}
 
-      {selectedUserId === "" ? (
-        <p>No users found.</p>
-      ) : (
-        <>
-          <section style={{ marginBottom: 16 }}>
-            <h3 style={{ marginBottom: 8 }}>Profile Summary</h3>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
-                Name: <strong>{selectedUser?.name ?? "-"}</strong>
-              </span>
-              <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
-                Role: <strong>{selectedUser?.role ?? "staff"}</strong>
-              </span>
-              <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
-                Min Weekly Hours: <strong>{selectedUser?.min_hours ?? 0}</strong>
-              </span>
-              <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
-                Max Weekly Hours: <strong>{selectedUser?.max_hours ?? 40}</strong>
-              </span>
-              <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
-                Availability Entries: <strong>{userAvailability.length}</strong>
-              </span>
-              <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
-                Weekly Availability Hours: <strong>{availabilityHours.toFixed(1)}</strong>
-              </span>
-              <span style={{ border: "1px solid #ccc", borderRadius: 999, padding: "6px 10px" }}>
-                Assigned Shifts: <strong>{assignedShifts.length}</strong>
-              </span>
+        <div className="my-profile__controls">
+          <label className="my-profile__field">
+            <span>User (Search)</span>
+            <div className="my-profile__user-picker">
+              <input
+                type="text"
+                value={userSearch}
+                placeholder="Type a name..."
+                onChange={e => {
+                  setUserSearch(e.target.value);
+                  setIsUserMenuOpen(true);
+                }}
+                onFocus={() => setIsUserMenuOpen(true)}
+                onBlur={() => window.setTimeout(() => setIsUserMenuOpen(false), 120)}
+                disabled={users.length === 0}
+              />
+              {isUserMenuOpen && users.length > 0 && (
+                <div className="my-profile__user-menu">
+                  {filteredUsers.length === 0 ? (
+                    <div className="my-profile__user-item my-profile__user-item--empty">No matches</div>
+                  ) : (
+                    filteredUsers.map(user => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        className={`my-profile__user-item${selectedUserId === user.id ? " my-profile__user-item--active" : ""}`}
+                        onMouseDown={() => {
+                          setSelectedUserId(user.id);
+                          setUserSearch(user.name);
+                          setIsUserMenuOpen(false);
+                        }}
+                      >
+                        {user.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
-          </section>
+          </label>
+        </div>
 
-          <section style={{ marginBottom: 22 }}>
-            <h3 style={{ marginBottom: 8 }}>Submitted Availability</h3>
-            {userAvailability.length === 0 ? (
-              <p>No availability submitted yet.</p>
-            ) : (
-              <table style={{ borderCollapse: "collapse", width: "100%", textAlign: "left" }}>
-                <thead>
-                  <tr style={{ backgroundColor: "#f0f0f0" }}>
-                    <th style={{ padding: 8 }}>Day</th>
-                    <th style={{ padding: 8 }}>Start</th>
-                    <th style={{ padding: 8 }}>End</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {userAvailability.map(item => (
-                    <tr key={item.id} style={{ borderBottom: "1px solid #ddd" }}>
-                      <td style={{ padding: 8 }}>{days[item.day_of_week]}</td>
-                      <td style={{ padding: 8 }}>{formatTime(item.start_time)}</td>
-                      <td style={{ padding: 8 }}>{formatTime(item.end_time)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
+        {selectedUserId === "" ? (
+          <p className="my-profile__empty">
+            {users.length === 0 ? "No users found." : "Pick a user to view profile details."}
+          </p>
+        ) : (
+          <>
+            <section className="my-profile__section">
+              <h3>Profile Summary</h3>
+              <div className="my-profile__chips">
+                <span className="my-profile__chip">Name: <strong>{selectedUser?.name ?? "-"}</strong></span>
+                <span className="my-profile__chip">Role: <strong>{selectedUser?.role ?? "staff"}</strong></span>
+                <span className="my-profile__chip">Min Weekly Hours: <strong>{selectedUser?.min_hours ?? 0}</strong></span>
+                <span className="my-profile__chip">Max Weekly Hours: <strong>{selectedUser?.max_hours ?? 40}</strong></span>
+                <span className="my-profile__chip">Weekly Availability Hours: <strong>{availabilityHours.toFixed(1)}</strong></span>
+              </div>
+            </section>
 
-          <section>
-            <h3 style={{ marginBottom: 8 }}>Current Assigned Shifts</h3>
-            {assignedShifts.length === 0 ? (
-              <p>No assigned shifts this week.</p>
-            ) : (
-              <table style={{ borderCollapse: "collapse", width: "100%", textAlign: "left" }}>
-                <thead>
-                  <tr style={{ backgroundColor: "#f0f0f0" }}>
-                    <th style={{ padding: 8 }}>Day</th>
-                    <th style={{ padding: 8 }}>Start</th>
-                    <th style={{ padding: 8 }}>End</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {assignedShifts.map(shift => (
-                    <tr key={shift.id} style={{ borderBottom: "1px solid #ddd" }}>
-                      <td style={{ padding: 8 }}>{days[shift.day_of_week]}</td>
-                      <td style={{ padding: 8 }}>{formatTime(shift.start_time)}</td>
-                      <td style={{ padding: 8 }}>{formatTime(shift.end_time)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-        </>
-      )}
-    </div>
+            <section className="my-profile__section">
+              <h3>Submitted Availability</h3>
+              {userAvailability.length === 0 ? (
+                <p className="my-profile__empty">No availability submitted yet.</p>
+              ) : (
+                <div className="my-profile__table-wrap">
+                  <table className="my-profile__table">
+                    <thead>
+                      <tr>
+                        <th>Day</th>
+                        <th>Start</th>
+                        <th>End</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {userAvailability.map(item => (
+                        <tr key={item.id}>
+                          <td>{days[item.day_of_week]}</td>
+                          <td>{formatTime(item.start_time)}</td>
+                          <td>{formatTime(item.end_time)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section className="my-profile__section">
+              <h3>Current Assigned Shifts</h3>
+              {assignedShifts.length === 0 ? (
+                <p className="my-profile__empty">No assigned shifts this week.</p>
+              ) : (
+                <div className="my-profile__table-wrap">
+                  <table className="my-profile__table">
+                    <thead>
+                      <tr>
+                        <th>Day</th>
+                        <th>Start</th>
+                        <th>End</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assignedShifts.map(shift => (
+                        <tr key={shift.id}>
+                          <td>{days[shift.day_of_week]}</td>
+                          <td>{formatTime(shift.start_time)}</td>
+                          <td>{formatTime(shift.end_time)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </>
+        )}
+      </div>
+    </section>
   );
 }
