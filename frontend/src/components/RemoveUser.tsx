@@ -77,7 +77,6 @@ export default function RemoveUser({ refreshRoster }: RemoveUserProps) {
     <section className="remove-user">
       <div className="remove-user__shell">
         <header className="remove-user__hero">
-          <p className="remove-user__eyebrow">User Admin</p>
           <h2>Remove User</h2>
           <p className="remove-user__lead">
             Select a user and permanently remove them from the system.

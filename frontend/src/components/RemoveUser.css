@@ -3,8 +3,8 @@
   --muted: #586a7d;
   --line: #d4e1ed;
   --surface: #ffffff;
-  --brand: #0f5d95;
-  --brand-strong: #0a4c7c;
+  --danger: #b62020;
+  --danger-strong: #951818;
   --ok: #1d7f49;
   --bad: #a52a2a;
   color: var(--ink);
@@ -15,8 +15,8 @@
 
 .remove-user__shell {
   background:
-    radial-gradient(120% 130% at 0% 0%, #f4fbff 0%, transparent 55%),
-    radial-gradient(100% 120% at 100% 0%, #edf6ec 0%, transparent 50%),
+    radial-gradient(120% 130% at 0% 0%, #fff6f6 0%, transparent 55%),
+    radial-gradient(100% 120% at 100% 0%, #f8f2fb 0%, transparent 50%),
     var(--surface);
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -30,7 +30,7 @@
 }
 
 .remove-user__eyebrow {
-  color: #486683;
+  color: #7f4a4a;
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -86,9 +86,9 @@
 }
 
 .remove-user__badge--loading {
-  background: #e6f2fb;
-  border-color: #bad7ec;
-  color: var(--brand-strong);
+  background: #fdeeee;
+  border-color: #efc8c8;
+  color: var(--bad);
 }
 
 .remove-user__badge--success {
@@ -104,7 +104,7 @@
 }
 
 .remove-user__loader {
-  background: #ecf3fa;
+  background: #f7e6e6;
   border-radius: 999px;
   height: 9px;
   overflow: hidden;
@@ -112,7 +112,7 @@
 
 .remove-user__loader span {
   animation: remove-user-progress 1.2s linear infinite;
-  background: linear-gradient(90deg, #6db5e6 0%, var(--brand) 60%, #6db5e6 100%);
+  background: linear-gradient(90deg, #e66d6d 0%, var(--danger) 60%, #e66d6d 100%);
   display: block;
   height: 100%;
   width: 38%;
@@ -136,9 +136,9 @@
 
 .remove-user__message--idle,
 .remove-user__message--loading {
-  background: #f5f9fd;
-  border: 1px solid #dbe7f2;
-  color: #2e4b66;
+  background: #fef4f4;
+  border: 1px solid #f2d5d5;
+  color: #7f3f3f;
 }
 
 .remove-user__message--success {
@@ -168,7 +168,7 @@
 }
 
 .remove-user__select {
-  border: 1px solid #b8cde0;
+  border: 1px solid #d8b2b2;
   border-radius: 8px;
   color: var(--ink);
   font-size: 0.95rem;
@@ -177,15 +177,15 @@
 }
 
 .remove-user__summary {
-  background: #f8fbff;
-  border: 1px solid #dde9f4;
+  background: #fff6f6;
+  border: 1px solid #f2d5d5;
   border-radius: 10px;
   margin: 0;
   padding: 10px 12px;
 }
 
 .remove-user__button {
-  background: linear-gradient(135deg, #b62020 0%, #951818 100%);
+  background: linear-gradient(135deg, var(--danger) 0%, var(--danger-strong) 100%);
   border: 1px solid #7f1414;
   border-radius: 11px;
   color: #fff;
