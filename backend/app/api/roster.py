@@ -233,6 +233,35 @@ def get_available_roster_weeks(db: Session = Depends(get_db)) -> List[str]:
     return [week_start.isoformat() for (week_start,) in weeks]
 
 
+@router.delete("/week/{week_start_date}")
+def delete_roster_week(week_start_date: date, db: Session = Depends(get_db)):
+    resolved_week_start = get_week_start(week_start_date)
+
+    shifts = db.query(ShiftDB).filter_by(week_start_date=resolved_week_start).all()
+    if not shifts:
+        raise HTTPException(status_code=404, detail="Roster week not found")
+
+    shift_ids = [shift.id for shift in shifts]
+    deleted_assignments = (
+        db.query(ShiftAssignmentDB)
+        .filter(ShiftAssignmentDB.shift_id.in_(shift_ids))
+        .delete(synchronize_session=False)
+    )
+    deleted_shifts = (
+        db.query(ShiftDB)
+        .filter_by(week_start_date=resolved_week_start)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+
+    return {
+        "status": "roster week deleted",
+        "week_start_date": resolved_week_start.isoformat(),
+        "deleted_shifts": deleted_shifts,
+        "deleted_assignments": deleted_assignments,
+    }
+
+
 @router.get("/coverage")
 def get_shift_coverage(week_start_date: date | None = None, db: Session = Depends(get_db)):
     resolved_week_start = resolve_week_start(db, week_start_date)
