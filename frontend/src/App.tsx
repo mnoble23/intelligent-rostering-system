@@ -1,5 +1,6 @@
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from "react-router-dom";
 import { type ReactElement, useCallback, useEffect, useState } from "react";
+import "./App.css";
 
 import API from "./services/api";
 import RosterTable from "./components/RosterTable";
@@ -83,94 +84,117 @@ export default function App() {
     );
   }
 
+  const navItems =
+    role === "manager"
+      ? [
+          { to: "/", label: "Roster Dashboard" },
+          { to: "/shift-coverage", label: "Shift Coverage" },
+          { to: "/generate-roster", label: "Generate Roster" },
+          { to: "/manage-shifts", label: "Manage Shifts" },
+          { to: "/submit-availability", label: "Submit Availability" },
+          { to: "/my-roster", label: "My Roster" },
+          { to: "/my-profile", label: "My Profile" },
+        ]
+      : [
+          { to: "/", label: "Roster Dashboard" },
+          { to: "/my-roster", label: "My Roster" },
+          { to: "/my-profile", label: "My Profile" },
+          { to: "/submit-availability", label: "Submit Availability" },
+        ];
+
   return (
     <Router>
-      <nav style={{ padding: 10, borderBottom: "1px solid #ccc", marginBottom: 20 }}>
-        {role === "manager" ? (
-          <>
-            <Link to="/" style={{ marginRight: 10 }}>Roster Dashboard</Link>
-            <Link to="/shift-coverage" style={{ marginRight: 10 }}>Shift Coverage</Link>
-            <Link to="/generate-roster" style={{ marginRight: 10 }}>Generate Roster</Link>
-            <Link to="/manage-shifts" style={{ marginRight: 10 }}>Manage Shifts</Link>
-            <Link to="/submit-availability" style={{ marginRight: 10 }}>Submit Availability</Link>
-            <Link to="/my-roster" style={{ marginRight: 10 }}>My Roster</Link>
-            <Link to="/my-profile" style={{ marginRight: 10 }}>My Profile</Link>
-          </>
-        ) : (
-          <>
-            <Link to="/" style={{ marginRight: 10 }}>Roster Dashboard</Link>
-            <Link to="/my-roster" style={{ marginRight: 10 }}>My Roster</Link>
-            <Link to="/my-profile" style={{ marginRight: 10 }}>My Profile</Link>
-            <Link to="/submit-availability" style={{ marginRight: 10 }}>Submit Availability</Link>
-          </>
-        )}
-        <button type="button" onClick={clearRole}>Switch Role</button>
-      </nav>
+      <div className="app-shell">
+        <aside className="app-sidebar">
+          <div className="app-sidebar__brand">
+            <h1>Roster OS</h1>
+            <p>{role === "manager" ? "Manager workspace" : "Staff workspace"}</p>
+          </div>
+          <nav className="app-sidebar__links">
+            {navItems.map(item => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `app-sidebar__link${isActive ? " app-sidebar__link--active" : ""}`}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+          <div className="app-sidebar__footer">
+            <button type="button" className="app-sidebar__switch" onClick={clearRole}>
+              Switch Role
+            </button>
+          </div>
+        </aside>
 
-      <Routes>
-        <Route
-          path="/"
-          element={(
-            <RoleGate role={role} allowedRoles={["manager", "staff"]}>
-              <DashboardPage shifts={shifts} refreshRoster={fetchRoster} />
-            </RoleGate>
-          )}
-        />
-        <Route
-          path="/shift-coverage"
-          element={(
-            <RoleGate role={role} allowedRoles={["manager"]}>
-              <ShiftCoverage />
-            </RoleGate>
-          )}
-        />
-        <Route
-          path="/submit-availability"
-          element={(
-            <RoleGate role={role} allowedRoles={["manager", "staff"]}>
-              <UserAvailabilityForm />
-            </RoleGate>
-          )}
-        />
-        <Route
-          path="/generate-roster"
-          element={(
-            <RoleGate role={role} allowedRoles={["manager"]}>
-              <GenerateRoster refreshRoster={fetchRoster} />
-            </RoleGate>
-          )}
-        />
-        <Route
-          path="/manage-shifts"
-          element={(
-            <RoleGate role={role} allowedRoles={["manager"]}>
-              <ManageShiftAssignments />
-            </RoleGate>
-          )}
-        />
-        <Route
-          path="/my-roster"
-          element={(
-            <RoleGate role={role} allowedRoles={["manager", "staff"]}>
-              <MyRoster />
-            </RoleGate>
-          )}
-        />
-        <Route
-          path="/my-profile"
-          element={(
-            <RoleGate role={role} allowedRoles={["manager", "staff"]}>
-              <MyProfile />
-            </RoleGate>
-          )}
-        />
-        <Route
-          path="*"
-          element={(
-            <Navigate to={role === "manager" ? "/" : "/my-roster"} replace />
-          )}
-        />
-      </Routes>
+        <main className="app-content">
+          <Routes>
+            <Route
+              path="/"
+              element={(
+                <RoleGate role={role} allowedRoles={["manager", "staff"]}>
+                  <DashboardPage shifts={shifts} refreshRoster={fetchRoster} />
+                </RoleGate>
+              )}
+            />
+            <Route
+              path="/shift-coverage"
+              element={(
+                <RoleGate role={role} allowedRoles={["manager"]}>
+                  <ShiftCoverage />
+                </RoleGate>
+              )}
+            />
+            <Route
+              path="/submit-availability"
+              element={(
+                <RoleGate role={role} allowedRoles={["manager", "staff"]}>
+                  <UserAvailabilityForm />
+                </RoleGate>
+              )}
+            />
+            <Route
+              path="/generate-roster"
+              element={(
+                <RoleGate role={role} allowedRoles={["manager"]}>
+                  <GenerateRoster refreshRoster={fetchRoster} />
+                </RoleGate>
+              )}
+            />
+            <Route
+              path="/manage-shifts"
+              element={(
+                <RoleGate role={role} allowedRoles={["manager"]}>
+                  <ManageShiftAssignments />
+                </RoleGate>
+              )}
+            />
+            <Route
+              path="/my-roster"
+              element={(
+                <RoleGate role={role} allowedRoles={["manager", "staff"]}>
+                  <MyRoster />
+                </RoleGate>
+              )}
+            />
+            <Route
+              path="/my-profile"
+              element={(
+                <RoleGate role={role} allowedRoles={["manager", "staff"]}>
+                  <MyProfile />
+                </RoleGate>
+              )}
+            />
+            <Route
+              path="*"
+              element={(
+                <Navigate to={role === "manager" ? "/" : "/my-roster"} replace />
+              )}
+            />
+          </Routes>
+        </main>
+      </div>
     </Router>
   );
 }

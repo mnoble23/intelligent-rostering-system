@@ -1,38 +1,115 @@
-.App {
-  text-align: center;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
+.app-shell {
+  background: linear-gradient(135deg, #f7fafc 0%, #eef3f8 100%);
+  display: flex;
   min-height: 100vh;
+}
+
+.app-sidebar {
+  background: linear-gradient(180deg, #12263a 0%, #1a3147 100%);
+  color: #d5e4f2;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  gap: 14px;
+  padding: 22px 16px;
+  width: 250px;
 }
 
-.App-link {
-  color: #61dafb;
+.app-sidebar__brand h1 {
+  color: #fff;
+  font-size: 1.25rem;
+  letter-spacing: 0.04em;
+  margin: 0;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
+.app-sidebar__brand p {
+  color: #9fb8d0;
+  margin: 6px 0 0;
+}
+
+.app-sidebar__links {
+  display: grid;
+  gap: 6px;
+}
+
+.app-sidebar__link {
+  border-left: 3px solid transparent;
+  border-radius: 8px;
+  color: #d6e4f1;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 10px 10px 10px 12px;
+  text-decoration: none;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.app-sidebar__link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.app-sidebar__link--active {
+  background: rgba(142, 212, 255, 0.18);
+  border-left-color: #7ad3ff;
+  color: #ffffff;
+}
+
+.app-sidebar__footer {
+  margin-top: auto;
+}
+
+.app-sidebar__switch {
+  background: #f2f8ff;
+  border: 1px solid #c9d9ea;
+  border-radius: 10px;
+  color: #1f3b56;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.app-content {
+  flex: 1;
+  overflow-x: auto;
+  padding: 10px 16px 20px;
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    display: block;
   }
-  to {
-    transform: rotate(360deg);
+
+  .app-sidebar {
+    padding: 12px;
+    width: auto;
+  }
+
+  .app-sidebar__links {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .app-sidebar__link {
+    border-left: 0;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .app-sidebar__link--active {
+    border-left-color: transparent;
+  }
+
+  .app-sidebar__footer {
+    margin-top: 2px;
+  }
+
+  .app-sidebar__switch {
+    width: auto;
+  }
+
+  .app-content {
+    padding: 8px 10px 18px;
   }
 }
