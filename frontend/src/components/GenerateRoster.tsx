@@ -1,5 +1,5 @@
 import API from "../services/api";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./GenerateRoster.css";
 
 interface GenerateRosterProps {
@@ -8,17 +8,51 @@ interface GenerateRosterProps {
   startDate?: string;
 }
 
+function toIsoWeek(value?: string) {
+  if (!value) return "";
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayOfWeek);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+function isoWeekToMonday(value: string) {
+  const [yearPart, weekPart] = value.split("-W");
+  const year = Number(yearPart);
+  const week = Number(weekPart);
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const jan4Day = jan4.getUTCDay() || 7;
+  const monday = new Date(jan4);
+  monday.setUTCDate(jan4.getUTCDate() - jan4Day + 1 + (week - 1) * 7);
+  const mm = String(monday.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(monday.getUTCDate()).padStart(2, "0");
+  return `${monday.getUTCFullYear()}-${mm}-${dd}`;
+}
+
 export default function GenerateRoster({ refreshRoster, refreshWeeks, startDate }: GenerateRosterProps) {
   const [status, setStatus] = useState("");
   const [statusType, setStatusType] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [weeks, setWeeks] = useState(1);
+  const [targetWeek, setTargetWeek] = useState(toIsoWeek(startDate));
+
+  useEffect(() => {
+    setTargetWeek(toIsoWeek(startDate));
+  }, [startDate]);
 
   const handleGenerate = async () => {
-    setStatus(`Generating roster for ${weeks} week${weeks === 1 ? "" : "s"}...`);
+    if (!targetWeek) {
+      setStatus("Pick a week first.");
+      setStatusType("error");
+      return;
+    }
+    setStatus("Generating roster...");
     setStatusType("loading");
     try {
-      await API.post("/roster/generate", startDate ? { weeks, start_date: startDate } : { weeks });
-      setStatus(`Roster generated successfully for ${weeks} week${weeks === 1 ? "" : "s"}. Dashboard data is now up to date.`);
+      const mondayDate = isoWeekToMonday(targetWeek);
+      await API.post("/roster/generate", { weeks: 1, start_date: mondayDate });
+      setStatus("Roster generated successfully for selected week. Dashboard data is now up to date.");
       setStatusType("success");
       if (refreshRoster) {
         refreshRoster();
@@ -64,14 +98,12 @@ export default function GenerateRoster({ refreshRoster, refreshWeeks, startDate 
 
           <div className="generate-roster__actions">
             <label className="generate-roster__weeks-control">
-              Number of weeks
+              Week
               <input
                 className="generate-roster__weeks-input"
-                type="number"
-                min={1}
-                max={52}
-                value={weeks}
-                onChange={event => setWeeks(Math.min(52, Math.max(1, Number(event.target.value) || 1)))}
+                type="week"
+                value={targetWeek}
+                onChange={event => setTargetWeek(event.target.value)}
                 disabled={statusType === "loading"}
               />
             </label>
