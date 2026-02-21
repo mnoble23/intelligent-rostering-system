@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import time
+from datetime import date, time
 from typing import Dict, List, Tuple
 from app.models.shift_db import ShiftDB
 from app.models.shift_assignment_db import ShiftAssignmentDB
@@ -18,12 +18,13 @@ MANAGER_ROLE = "manager"
 
 @dataclass
 class Shift:
+    week_start_date: date
     day_of_week: int
     start_time: time
     end_time: time
     staff: List[int] = field(default_factory=list)
 
-def generate_weekly_shifts() -> Dict[int, List[Shift]]:
+def generate_weekly_shifts(week_start_date: date) -> Dict[int, List[Shift]]:
     weekly_shifts: Dict[int, List[Shift]] = {}
     for day in range(7):
         shifts: List[Shift] = []
@@ -33,6 +34,7 @@ def generate_weekly_shifts() -> Dict[int, List[Shift]]:
                 if end_hour > BUSINESS_END:
                     continue
                 shift = Shift(
+                    week_start_date=week_start_date,
                     day_of_week=day,
                     start_time=time(hour=start_hour),
                     end_time=time(hour=end_hour),
@@ -69,6 +71,7 @@ def match_availability_to_shifts(
 def assign_staff_to_shifts(
     db: Session,
     staffable_shifts: Dict[int, List[Shift]],
+    week_start_date: date,
     min_staff_per_shift: int = MIN_STAFF_PER_SHIFT,
     user_hour_limits: UserHourLimits | None = None,
     user_roles: UserRoles | None = None,
@@ -358,8 +361,15 @@ def assign_staff_to_shifts(
             f"First uncovered slot: day={first_uncovered_day}, hour={first_uncovered_hour:02d}:00."
         )
 
-    db.query(ShiftAssignmentDB).delete()
-    db.query(ShiftDB).delete()
+    existing_shift_ids = [
+        shift_id
+        for (shift_id,) in db.query(ShiftDB.id).filter_by(week_start_date=week_start_date).all()
+    ]
+    if existing_shift_ids:
+        db.query(ShiftAssignmentDB).filter(
+            ShiftAssignmentDB.shift_id.in_(existing_shift_ids)
+        ).delete(synchronize_session=False)
+    db.query(ShiftDB).filter_by(week_start_date=week_start_date).delete(synchronize_session=False)
     db.commit()
 
     for day, ordered_shifts in ordered_shifts_by_day.items():
@@ -374,6 +384,7 @@ def assign_staff_to_shifts(
             db_shift = (
                 db.query(ShiftDB)
                 .filter_by(
+                    week_start_date=week_start_date,
                     day_of_week=shift.day_of_week,
                     start_time=shift.start_time,
                     end_time=shift.end_time,
@@ -382,6 +393,7 @@ def assign_staff_to_shifts(
             )
             if not db_shift:
                 db_shift = ShiftDB(
+                    week_start_date=week_start_date,
                     day_of_week=shift.day_of_week,
                     start_time=shift.start_time,
                     end_time=shift.end_time,
