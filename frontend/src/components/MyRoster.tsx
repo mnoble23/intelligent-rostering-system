@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import API from "../services/api";
+import "./MyRoster.css";
 
 interface User {
   id: number;
@@ -32,6 +33,8 @@ export default function MyRoster() {
   const [users, setUsers] = useState<User[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | "">("");
+  const [userSearch, setUserSearch] = useState("");
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -40,9 +43,8 @@ export default function MyRoster() {
         const [usersRes, shiftsRes] = await Promise.all([API.get("/users"), API.get("/roster")]);
         setUsers(usersRes.data);
         setShifts(shiftsRes.data);
-        if (usersRes.data.length > 0) {
-          setSelectedUserId(usersRes.data[0].id);
-        }
+        setSelectedUserId("");
+        setUserSearch("");
       } catch (err) {
         console.error(err);
         setStatus("Failed to load roster data.");
@@ -62,52 +64,109 @@ export default function MyRoster() {
       });
   }, [selectedUserId, shifts]);
 
+  const selectedUserName =
+    selectedUserId === ""
+      ? ""
+      : users.find(user => user.id === selectedUserId)?.name ?? "";
+
+  const filteredUsers = useMemo(() => {
+    const query = userSearch.trim().toLowerCase();
+    const matches = query.length === 0
+      ? users
+      : users.filter(user => user.name.toLowerCase().includes(query));
+    return matches.slice(0, 12);
+  }, [users, userSearch]);
+
   return (
-    <div style={{ maxWidth: 900, margin: "20px auto" }}>
-      <h2>My Roster</h2>
-      {status && <p>{status}</p>}
+    <section className="my-roster">
+      <div className="my-roster__shell">
+        <header className="my-roster__hero">
+          <p className="my-roster__eyebrow">Weekly Plan</p>
+          <h2>My Roster</h2>
+          <p className="my-roster__lead">Review assigned shifts by day and time for the current week.</p>
+        </header>
 
-      <div style={{ marginBottom: 16 }}>
-        <label>
-          User{" "}
-          <select
-            value={selectedUserId}
-            onChange={e => setSelectedUserId(Number(e.target.value))}
-            disabled={users.length === 0}
-          >
-            {users.map(user => (
-              <option key={user.id} value={user.id}>
-                {user.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {status && <p className="my-roster__status">{status}</p>}
+
+        <div className="my-roster__controls">
+          <label className="my-roster__field">
+            <span>User (Search)</span>
+            <div className="my-roster__user-picker">
+              <input
+                type="text"
+                value={userSearch}
+                placeholder="Type a name..."
+                onChange={e => {
+                  setUserSearch(e.target.value);
+                  setIsUserMenuOpen(true);
+                }}
+                onFocus={() => setIsUserMenuOpen(true)}
+                onBlur={() => window.setTimeout(() => setIsUserMenuOpen(false), 120)}
+                disabled={users.length === 0}
+              />
+              {isUserMenuOpen && users.length > 0 && (
+                <div className="my-roster__user-menu">
+                  {filteredUsers.length === 0 ? (
+                    <div className="my-roster__user-item my-roster__user-item--empty">No matches</div>
+                  ) : (
+                    filteredUsers.map(user => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        className={`my-roster__user-item${selectedUserId === user.id ? " my-roster__user-item--active" : ""}`}
+                        onMouseDown={() => {
+                          setSelectedUserId(user.id);
+                          setUserSearch(user.name);
+                          setIsUserMenuOpen(false);
+                        }}
+                      >
+                        {user.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </label>
+          <div className="my-roster__stat">
+            <span>Selected</span>
+            <strong>{selectedUserName || "None"}</strong>
+          </div>
+          <div className="my-roster__stat">
+            <span>Total Shifts</span>
+            <strong>{myShifts.length}</strong>
+          </div>
+        </div>
+
+        {selectedUserId === "" ? (
+          <p className="my-roster__empty">
+            {users.length === 0 ? "No users found." : "Pick a user to view roster."}
+          </p>
+        ) : myShifts.length === 0 ? (
+          <p className="my-roster__empty">No shifts assigned this week.</p>
+        ) : (
+          <div className="my-roster__table-wrap">
+            <table className="my-roster__table">
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Start</th>
+                  <th>End</th>
+                </tr>
+              </thead>
+              <tbody>
+                {myShifts.map(shift => (
+                  <tr key={shift.id}>
+                    <td>{days[shift.day_of_week]}</td>
+                    <td>{formatTime(shift.start_time)}</td>
+                    <td>{formatTime(shift.end_time)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-
-      {selectedUserId === "" ? (
-        <p>No users found.</p>
-      ) : myShifts.length === 0 ? (
-        <p>No shifts assigned this week.</p>
-      ) : (
-        <table style={{ borderCollapse: "collapse", width: "100%", textAlign: "left" }}>
-          <thead>
-            <tr style={{ backgroundColor: "#f0f0f0" }}>
-              <th style={{ padding: 8 }}>Day</th>
-              <th style={{ padding: 8 }}>Start</th>
-              <th style={{ padding: 8 }}>End</th>
-            </tr>
-          </thead>
-          <tbody>
-            {myShifts.map(shift => (
-              <tr key={shift.id} style={{ borderBottom: "1px solid #ddd" }}>
-                <td style={{ padding: 8 }}>{days[shift.day_of_week]}</td>
-                <td style={{ padding: 8 }}>{formatTime(shift.start_time)}</td>
-                <td style={{ padding: 8 }}>{formatTime(shift.end_time)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
+    </section>
   );
 }
