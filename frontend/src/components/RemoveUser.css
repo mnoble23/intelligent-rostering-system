@@ -1,0 +1,223 @@
+.remove-user {
+  --ink: #142233;
+  --muted: #586a7d;
+  --line: #d4e1ed;
+  --surface: #ffffff;
+  --brand: #0f5d95;
+  --brand-strong: #0a4c7c;
+  --ok: #1d7f49;
+  --bad: #a52a2a;
+  color: var(--ink);
+  font-family: "Trebuchet MS", "Verdana", sans-serif;
+  margin: 20px auto;
+  max-width: 760px;
+}
+
+.remove-user__shell {
+  background:
+    radial-gradient(120% 130% at 0% 0%, #f4fbff 0%, transparent 55%),
+    radial-gradient(100% 120% at 100% 0%, #edf6ec 0%, transparent 50%),
+    var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 20px 40px rgba(12, 35, 56, 0.08);
+  overflow: hidden;
+}
+
+.remove-user__hero {
+  border-bottom: 1px solid var(--line);
+  padding: 22px 22px 16px;
+}
+
+.remove-user__eyebrow {
+  color: #486683;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.remove-user__hero h2 {
+  font-size: 1.75rem;
+  margin: 0;
+}
+
+.remove-user__lead {
+  color: var(--muted);
+  margin: 8px 0 0;
+  max-width: 62ch;
+}
+
+.remove-user__panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px 22px 22px;
+}
+
+.remove-user__status-row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.remove-user__label {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.remove-user__badge {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 5px 10px;
+  text-transform: uppercase;
+}
+
+.remove-user__badge--idle {
+  background: #f2f5f8;
+  border-color: #d8e0e9;
+  color: #4b5f74;
+}
+
+.remove-user__badge--loading {
+  background: #e6f2fb;
+  border-color: #bad7ec;
+  color: var(--brand-strong);
+}
+
+.remove-user__badge--success {
+  background: #eaf6ed;
+  border-color: #bddfc8;
+  color: var(--ok);
+}
+
+.remove-user__badge--error {
+  background: #fdeeee;
+  border-color: #efc8c8;
+  color: var(--bad);
+}
+
+.remove-user__loader {
+  background: #ecf3fa;
+  border-radius: 999px;
+  height: 9px;
+  overflow: hidden;
+}
+
+.remove-user__loader span {
+  animation: remove-user-progress 1.2s linear infinite;
+  background: linear-gradient(90deg, #6db5e6 0%, var(--brand) 60%, #6db5e6 100%);
+  display: block;
+  height: 100%;
+  width: 38%;
+}
+
+@keyframes remove-user-progress {
+  from {
+    margin-left: -38%;
+  }
+  to {
+    margin-left: 100%;
+  }
+}
+
+.remove-user__message {
+  border-radius: 10px;
+  font-size: 0.95rem;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.remove-user__message--idle,
+.remove-user__message--loading {
+  background: #f5f9fd;
+  border: 1px solid #dbe7f2;
+  color: #2e4b66;
+}
+
+.remove-user__message--success {
+  background: #ecf8f0;
+  border: 1px solid #c8e3d0;
+  color: var(--ok);
+}
+
+.remove-user__message--error {
+  background: #fff1f1;
+  border: 1px solid #f0cdcd;
+  color: var(--bad);
+}
+
+.remove-user__actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.remove-user__control {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.92rem;
+  font-weight: 700;
+  gap: 10px;
+}
+
+.remove-user__select {
+  border: 1px solid #b8cde0;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 0.95rem;
+  padding: 7px 10px;
+  width: 260px;
+}
+
+.remove-user__summary {
+  background: #f8fbff;
+  border: 1px solid #dde9f4;
+  border-radius: 10px;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.remove-user__button {
+  background: linear-gradient(135deg, #b62020 0%, #951818 100%);
+  border: 1px solid #7f1414;
+  border-radius: 11px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.96rem;
+  font-weight: 700;
+  padding: 10px 16px;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.remove-user__button:hover:not(:disabled) {
+  box-shadow: 0 10px 18px rgba(130, 20, 20, 0.25);
+  transform: translateY(-1px);
+}
+
+.remove-user__button:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
+@media (max-width: 680px) {
+  .remove-user {
+    margin: 12px auto;
+  }
+
+  .remove-user__hero,
+  .remove-user__panel {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .remove-user__hero h2 {
+    font-size: 1.45rem;
+  }
+}

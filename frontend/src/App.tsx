@@ -8,6 +8,7 @@ import UserAvailabilityForm from "./components/UserAvailabilityForm";
 import GenerateRoster from "./components/GenerateRoster";
 import ManageShiftAssignments from "./components/ManageShiftAssignments";
 import DeleteRosterWeek from "./components/DeleteRosterWeek";
+import RemoveUser from "./components/RemoveUser";
 import MyRoster from "./components/MyRoster";
 import ShiftCoverage from "./components/ShiftCoverage";
 import MyProfile from "./components/MyProfile";
@@ -122,6 +123,7 @@ export default function App() {
           { to: "/generate-roster", label: "Generate Roster" },
           { to: "/manage-shifts", label: "Manage Shifts" },
           { to: "/delete-roster-week", label: "Delete Roster Week" },
+          { to: "/remove-user", label: "Remove User" },
           { to: "/submit-availability", label: "Submit Availability" },
           { to: "/my-roster", label: "My Roster" },
           { to: "/my-profile", label: "My Profile" },
@@ -234,6 +236,14 @@ export default function App() {
                     refreshRoster={fetchRoster}
                     refreshWeeks={fetchWeeks}
                   />
+                </RoleGate>
+              )}
+            />
+            <Route
+              path="/remove-user"
+              element={(
+                <RoleGate role={role} allowedRoles={["manager"]}>
+                  <RemoveUser refreshRoster={fetchRoster} />
                 </RoleGate>
               )}
             />

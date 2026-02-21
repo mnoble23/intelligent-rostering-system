@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.db.session import get_db
+from app.models.availability_db import AvailabilityDB
+from app.models.shift_assignment_db import ShiftAssignmentDB
 from app.models.user_db import UserDB
 from app.schemas.user import UserCreate, UserRead
 
@@ -58,3 +60,30 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+@router.delete("/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(UserDB).filter_by(id=user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    deleted_availability = (
+        db.query(AvailabilityDB)
+        .filter_by(user_id=user_id)
+        .delete(synchronize_session=False)
+    )
+    deleted_assignments = (
+        db.query(ShiftAssignmentDB)
+        .filter_by(user_id=user_id)
+        .delete(synchronize_session=False)
+    )
+    db.delete(user)
+    db.commit()
+
+    return {
+        "status": "user deleted",
+        "deleted_user_id": user_id,
+        "deleted_assignments": deleted_assignments,
+        "deleted_availability": deleted_availability,
+    }
