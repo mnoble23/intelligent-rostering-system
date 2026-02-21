@@ -4,21 +4,27 @@ import "./GenerateRoster.css";
 
 interface GenerateRosterProps {
   refreshRoster?: () => void;
+  refreshWeeks?: () => void;
+  startDate?: string;
 }
 
-export default function GenerateRoster({ refreshRoster }: GenerateRosterProps) {
+export default function GenerateRoster({ refreshRoster, refreshWeeks, startDate }: GenerateRosterProps) {
   const [status, setStatus] = useState("");
   const [statusType, setStatusType] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [weeks, setWeeks] = useState(1);
 
   const handleGenerate = async () => {
-    setStatus("Generating roster...");
+    setStatus(`Generating roster for ${weeks} week${weeks === 1 ? "" : "s"}...`);
     setStatusType("loading");
     try {
-      await API.post("/roster/generate");
-      setStatus("Roster generated successfully. Dashboard data is now up to date.");
+      await API.post("/roster/generate", startDate ? { weeks, start_date: startDate } : { weeks });
+      setStatus(`Roster generated successfully for ${weeks} week${weeks === 1 ? "" : "s"}. Dashboard data is now up to date.`);
       setStatusType("success");
       if (refreshRoster) {
         refreshRoster();
+      }
+      if (refreshWeeks) {
+        refreshWeeks();
       }
     } catch (err) {
       console.error(err);
@@ -53,8 +59,23 @@ export default function GenerateRoster({ refreshRoster }: GenerateRosterProps) {
           )}
 
           <p className={`generate-roster__message generate-roster__message--${statusType}`}>
-            {status || "Click generate to build this week’s roster."}
+            {status || "Click generate to build this week's roster."}
           </p>
+
+          <div className="generate-roster__actions">
+            <label className="generate-roster__weeks-control">
+              Number of weeks
+              <input
+                className="generate-roster__weeks-input"
+                type="number"
+                min={1}
+                max={52}
+                value={weeks}
+                onChange={event => setWeeks(Math.min(52, Math.max(1, Number(event.target.value) || 1)))}
+                disabled={statusType === "loading"}
+              />
+            </label>
+          </div>
 
           <div className="generate-roster__actions">
             <button type="button" onClick={handleGenerate} disabled={statusType === "loading"} className="generate-roster__button">
