@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import API from "../services/api";
 import "./ShiftCoverage.css";
 
@@ -50,23 +50,23 @@ export default function ShiftCoverage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadCoverage = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const response = await API.get<CoverageResponse>("/roster/coverage");
-        setData(response.data);
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load shift coverage.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadCoverage();
+  const loadCoverage = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await API.get<CoverageResponse>("/roster/coverage");
+      setData(response.data);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load shift coverage.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadCoverage();
+  }, [loadCoverage]);
 
   const dayCards = useMemo(() => {
     if (!data) {
@@ -92,26 +92,53 @@ export default function ShiftCoverage() {
       });
   }, [data]);
 
+  const totalHours = useMemo(() => {
+    if (!data) return 0;
+    return data.summary.fully_staffed_hours + data.summary.understaffed_hours;
+  }, [data]);
+
+  const coverageRate = useMemo(() => {
+    if (totalHours === 0 || !data) return 0;
+    return Math.round((data.summary.fully_staffed_hours / totalHours) * 100);
+  }, [data, totalHours]);
+
   return (
     <section className="coverage" aria-label="Shift coverage by day and hour">
       <header className="coverage__header">
-        <div>
+        <div className="coverage__title-wrap">
+          <p className="coverage__eyebrow">Coverage Monitor</p>
           <h2>Shift Coverage</h2>
-          <p>Day strips show each hour as fully staffed or understaffed.</p>
+          <p>Track staffing health by day and hour with clear gaps highlighted.</p>
         </div>
-        {data && (
-          <div className="coverage__stats">
-            <span><strong>{data.summary.fully_staffed_hours}</strong> fully staffed</span>
-            <span><strong>{data.summary.understaffed_hours}</strong> understaffed</span>
-          </div>
-        )}
+        <button type="button" className="coverage__refresh" onClick={loadCoverage} disabled={loading}>
+          {loading ? "Refreshing..." : "Refresh"}
+        </button>
       </header>
 
-      {loading ? <p>Loading coverage...</p> : null}
-      {!loading && error ? <p>{error}</p> : null}
+      {loading ? <p className="coverage__state">Loading coverage...</p> : null}
+      {!loading && error ? <p className="coverage__state coverage__state--error">{error}</p> : null}
 
       {!loading && !error && data ? (
         <>
+          <div className="coverage__stats-grid">
+            <article className="coverage__stat-card">
+              <p>Coverage Rate</p>
+              <strong>{coverageRate}%</strong>
+            </article>
+            <article className="coverage__stat-card">
+              <p>Fully Staffed Hours</p>
+              <strong>{data.summary.fully_staffed_hours}</strong>
+            </article>
+            <article className="coverage__stat-card">
+              <p>Understaffed Hours</p>
+              <strong>{data.summary.understaffed_hours}</strong>
+            </article>
+            <article className="coverage__stat-card">
+              <p>Total Evaluated Hours</p>
+              <strong>{totalHours}</strong>
+            </article>
+          </div>
+
           <p className="coverage__meta">
             Business hours: {formatHourLabel(data.business_hours.start)} to {formatHourLabel(data.business_hours.end)}.
             Minimum staff per shift: {data.minimum_staff_per_shift}.

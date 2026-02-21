@@ -6,6 +6,8 @@
   --header: linear-gradient(140deg, #f6fafc 0%, #f1f9f3 50%, #fff8f1 100%);
   color: var(--ink);
   font-family: "Trebuchet MS", "Verdana", sans-serif;
+  margin: 20px auto;
+  max-width: 980px;
 }
 
 .coverage__header {
@@ -21,6 +23,19 @@
   padding: 16px;
 }
 
+.coverage__title-wrap {
+  min-width: 260px;
+}
+
+.coverage__eyebrow {
+  color: #4e687f;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
 .coverage__header h2 {
   font-size: 1.45rem;
   margin: 0;
@@ -31,18 +46,68 @@
   margin: 6px 0 0;
 }
 
-.coverage__stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.coverage__refresh {
+  background: #f2f8ff;
+  border: 1px solid #c5d9ec;
+  border-radius: 10px;
+  color: #1b456a;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 8px 12px;
 }
 
-.coverage__stats span {
+.coverage__refresh:hover:not(:disabled) {
+  background: #e8f2fb;
+}
+
+.coverage__refresh:disabled {
+  cursor: wait;
+  opacity: 0.8;
+}
+
+.coverage__state {
+  background: #f3f8fd;
+  border: 1px solid #d5e3f1;
+  border-radius: 10px;
+  color: #33526c;
+  font-weight: 700;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+}
+
+.coverage__state--error {
+  background: #fff1f1;
+  border-color: #efcaca;
+  color: #963232;
+}
+
+.coverage__stats-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+
+.coverage__stat-card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 999px;
-  font-size: 0.83rem;
-  padding: 6px 10px;
+  border-radius: 11px;
+  padding: 10px 11px;
+}
+
+.coverage__stat-card p {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.coverage__stat-card strong {
+  display: block;
+  font-size: 1.25rem;
+  margin-top: 4px;
 }
 
 .coverage__meta {
@@ -82,6 +147,7 @@
 }
 
 .coverage__day-card {
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px;
@@ -143,8 +209,16 @@
 }
 
 @media (max-width: 720px) {
+  .coverage {
+    margin: 10px auto;
+  }
+
   .coverage__header h2 {
     font-size: 1.2rem;
+  }
+
+  .coverage__stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .coverage__strip {
