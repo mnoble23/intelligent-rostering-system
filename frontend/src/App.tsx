@@ -18,6 +18,19 @@ interface DashboardPageProps {
 
 type AppRole = "manager" | "staff";
 
+function formatWeekOption(weekStartDate: string) {
+  const [year, month, day] = weekStartDate.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayOfWeek);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNumber = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  const dd = String(day).padStart(2, "0");
+  const mm = String(month).padStart(2, "0");
+  const yyyy = String(year);
+  return `Week ${weekNumber} - ${dd}/${mm}/${yyyy}`;
+}
+
 function DashboardPage({ shifts, weekStartDate }: DashboardPageProps) {
   return <RosterTable shifts={shifts} weekStartDate={weekStartDate} />;
 }
@@ -150,7 +163,7 @@ export default function App() {
               ) : (
                 availableWeeks.map(week => (
                   <option key={week} value={week}>
-                    {week}
+                    {formatWeekOption(week)}
                   </option>
                 ))
               )}
