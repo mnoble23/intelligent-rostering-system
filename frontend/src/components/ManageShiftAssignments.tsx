@@ -14,6 +14,16 @@ interface ShiftUpsertResponse {
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+function formatDayLabel(dayIndex: number, weekStartDate?: string) {
+  if (!weekStartDate) return days[dayIndex];
+  const [year, month, day] = weekStartDate.split("-").map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  baseDate.setDate(baseDate.getDate() + dayIndex);
+  const mm = String(baseDate.getMonth() + 1).padStart(2, "0");
+  const dd = String(baseDate.getDate()).padStart(2, "0");
+  return `${days[dayIndex]} ${dd}/${mm}`;
+}
+
 function formatTime(timeStr: string) {
   const [hour, minute] = timeStr.split(":").map(Number);
   const ampm = hour >= 12 ? "PM" : "AM";
@@ -193,7 +203,7 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
     ? users.find(user => user.id === selectedCell.userId)?.name ?? `User #${selectedCell.userId}`
     : "";
 
-  const selectedCellLabel = selectedCell ? `${selectedUserName} on ${days[selectedCell.dayIndex]}` : "";
+  const selectedCellLabel = selectedCell ? `${selectedUserName} on ${formatDayLabel(selectedCell.dayIndex, weekStartDate)}` : "";
 
   return (
     <div style={{ maxWidth: 900, margin: "20px auto" }}>
@@ -202,6 +212,7 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
 
       <RosterTable
         shifts={shifts}
+        weekStartDate={weekStartDate}
         employees={users}
         title="Manage Shift Assignments"
         subtitle="Click a day cell to open shift actions for that employee/day."
@@ -287,7 +298,7 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
 
             {dayShiftOptions.length > 0 && (
               <p className="shift-modal__hint">
-                Existing {days[selectedCell.dayIndex]} shifts:{" "}
+                Existing {formatDayLabel(selectedCell.dayIndex, weekStartDate)} shifts:{" "}
                 {dayShiftOptions.map(shift => `${formatTime(shift.start_time)}-${formatTime(shift.end_time)}`).join(", ")}
               </p>
             )}
@@ -309,3 +320,4 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
     </div>
   );
 }
+

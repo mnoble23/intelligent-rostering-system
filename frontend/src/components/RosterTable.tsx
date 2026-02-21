@@ -21,6 +21,7 @@ export interface EmployeeRow {
 
 interface RosterTableProps {
   shifts: ShiftAssignment[];
+  weekStartDate?: string;
   employees?: EmployeeRow[];
   title?: string;
   subtitle?: string;
@@ -35,6 +36,16 @@ interface RosterTableProps {
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+function formatDayLabel(dayIndex: number, weekStartDate?: string) {
+  if (!weekStartDate) return days[dayIndex];
+  const [year, month, day] = weekStartDate.split("-").map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  baseDate.setDate(baseDate.getDate() + dayIndex);
+  const dd = String(baseDate.getDate()).padStart(2, "0");
+  const mm = String(baseDate.getMonth() + 1).padStart(2, "0");
+  return `${days[dayIndex]} ${dd}/${mm}`;
+}
+
 function formatTime(timeStr: string) {
   const [hour, minute] = timeStr.split(":").map(Number);
   const ampm = hour >= 12 ? "PM" : "AM";
@@ -48,6 +59,7 @@ function sortByTime(a: string, b: string) {
 
 export default function RosterTable({
   shifts,
+  weekStartDate,
   employees: employeesProp,
   title = "Employee Calendar View",
   subtitle = "Rows are employees. Columns are days. Cells show assigned shift times.",
@@ -116,8 +128,8 @@ export default function RosterTable({
             <thead>
               <tr>
                 <th>Employee</th>
-                {days.map(day => (
-                  <th key={day}>{day}</th>
+                {days.map((_, dayIndex) => (
+                  <th key={dayIndex}>{formatDayLabel(dayIndex, weekStartDate)}</th>
                 ))}
               </tr>
             </thead>

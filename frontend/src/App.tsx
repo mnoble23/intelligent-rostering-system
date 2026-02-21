@@ -13,12 +13,13 @@ import MyProfile from "./components/MyProfile";
 
 interface DashboardPageProps {
   shifts: any[];
+  weekStartDate?: string;
 }
 
 type AppRole = "manager" | "staff";
 
-function DashboardPage({ shifts }: DashboardPageProps) {
-  return <RosterTable shifts={shifts} />;
+function DashboardPage({ shifts, weekStartDate }: DashboardPageProps) {
+  return <RosterTable shifts={shifts} weekStartDate={weekStartDate} />;
 }
 
 interface RoleGateProps {
@@ -168,7 +169,7 @@ export default function App() {
               path="/"
               element={(
                 <RoleGate role={role} allowedRoles={["manager", "staff"]}>
-                  <DashboardPage shifts={shifts} />
+                  <DashboardPage shifts={shifts} weekStartDate={selectedWeek || undefined} />
                 </RoleGate>
               )}
             />

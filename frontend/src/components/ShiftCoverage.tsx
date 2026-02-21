@@ -36,6 +36,16 @@ interface ShiftCoverageProps {
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+function formatDayLabel(dayIndex: number, weekStartDate?: string) {
+  if (!weekStartDate) return days[dayIndex];
+  const [year, month, day] = weekStartDate.split("-").map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  baseDate.setDate(baseDate.getDate() + dayIndex);
+  const mm = String(baseDate.getMonth() + 1).padStart(2, "0");
+  const dd = String(baseDate.getDate()).padStart(2, "0");
+  return `${days[dayIndex]} ${dd}/${mm}`;
+}
+
 function formatHourLabel(hourStr: string) {
   const [hourRaw] = hourStr.split(":");
   const hour = Number(hourRaw);
@@ -160,19 +170,19 @@ export default function ShiftCoverage({ weekStartDate }: ShiftCoverageProps) {
             {dayCards.map(day => (
               <article key={day.day_of_week} className="coverage__day-card">
                 <header className="coverage__day-header">
-                  <h3>{days[day.day_of_week]}</h3>
+                  <h3>{formatDayLabel(day.day_of_week, weekStartDate)}</h3>
                   <p>
                     {day.totals.under} understaffed, {day.totals.fully} fully staffed
                   </p>
                 </header>
 
-                <div className="coverage__strip" role="list" aria-label={`${days[day.day_of_week]} hourly coverage`}>
+                <div className="coverage__strip" role="list" aria-label={`${formatDayLabel(day.day_of_week, weekStartDate)} hourly coverage`}>
                   {day.hours.map(hour => (
                     <div
                       key={`${day.day_of_week}-${hour.hour_start}`}
                       role="listitem"
                       className={`coverage__block coverage__block--${hour.status}`}
-                      title={`${days[day.day_of_week]} ${formatHourLabel(hour.hour_start)}-${formatHourLabel(hour.hour_end)}: ${statusLabel(hour.status)} (${hour.assigned_staff}/${hour.required_staff} staff)`}
+                      title={`${formatDayLabel(day.day_of_week, weekStartDate)} ${formatHourLabel(hour.hour_start)}-${formatHourLabel(hour.hour_end)}: ${statusLabel(hour.status)} (${hour.assigned_staff}/${hour.required_staff} staff)`}
                     >
                       <span>{formatHourLabel(hour.hour_start)}</span>
                       <small>{hour.assigned_staff}/{hour.required_staff}</small>
@@ -187,3 +197,4 @@ export default function ShiftCoverage({ weekStartDate }: ShiftCoverageProps) {
     </section>
   );
 }
+

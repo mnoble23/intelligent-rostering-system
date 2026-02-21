@@ -49,6 +49,16 @@ function formatTime(timeStr: string) {
   return `${hour12}:${minute.toString().padStart(2, "0")} ${ampm}`;
 }
 
+function formatDayLabel(dayIndex: number, weekStartDate?: string) {
+  if (!weekStartDate) return days[dayIndex];
+  const [year, month, day] = weekStartDate.split("-").map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  baseDate.setDate(baseDate.getDate() + dayIndex);
+  const mm = String(baseDate.getMonth() + 1).padStart(2, "0");
+  const dd = String(baseDate.getDate()).padStart(2, "0");
+  return `${days[dayIndex]} ${dd}/${mm}`;
+}
+
 export default function MyProfile({ weekStartDate }: MyProfileProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [availability, setAvailability] = useState<Availability[]>([]);
@@ -209,7 +219,7 @@ export default function MyProfile({ weekStartDate }: MyProfileProps) {
                     <tbody>
                       {userAvailability.map(item => (
                         <tr key={item.id}>
-                          <td>{days[item.day_of_week]}</td>
+                          <td>{formatDayLabel(item.day_of_week, weekStartDate)}</td>
                           <td>{formatTime(item.start_time)}</td>
                           <td>{formatTime(item.end_time)}</td>
                         </tr>
@@ -237,7 +247,7 @@ export default function MyProfile({ weekStartDate }: MyProfileProps) {
                     <tbody>
                       {assignedShifts.map(shift => (
                         <tr key={shift.id}>
-                          <td>{days[shift.day_of_week]}</td>
+                          <td>{formatDayLabel(shift.day_of_week, weekStartDate)}</td>
                           <td>{formatTime(shift.start_time)}</td>
                           <td>{formatTime(shift.end_time)}</td>
                         </tr>
@@ -253,3 +263,4 @@ export default function MyProfile({ weekStartDate }: MyProfileProps) {
     </section>
   );
 }
+
