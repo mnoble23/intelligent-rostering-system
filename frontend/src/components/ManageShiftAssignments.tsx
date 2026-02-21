@@ -1,22 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import API from "../services/api";
+import RosterTable, { type EmployeeRow, type ShiftAssignment } from "./RosterTable";
+import "./ManageShiftAssignments.css";
 
 interface User {
   id: number;
   name: string;
 }
 
-interface Staff {
+interface ShiftUpsertResponse {
   id: number;
-  name: string;
-}
-
-interface Shift {
-  id: number;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  staff: Staff[];
 }
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -28,25 +21,26 @@ function formatTime(timeStr: string) {
   return `${hour12}:${minute.toString().padStart(2, "0")} ${ampm}`;
 }
 
+function toHHMM(timeStr: string) {
+  const [hour = "00", minute = "00"] = timeStr.split(":");
+  return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+}
+
 export default function ManageShiftAssignments() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<number | "">("");
-  const [selectedShiftId, setSelectedShiftId] = useState<number | "">("");
+  const [users, setUsers] = useState<EmployeeRow[]>([]);
+  const [shifts, setShifts] = useState<ShiftAssignment[]>([]);
+  const [selectedCell, setSelectedCell] = useState<{ userId: number; dayIndex: number } | null>(null);
+  const [currentShiftId, setCurrentShiftId] = useState<number | "">("");
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("17:00");
   const [status, setStatus] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadData = async () => {
     try {
       const [usersRes, shiftsRes] = await Promise.all([API.get("/users"), API.get("/roster")]);
-      setUsers(usersRes.data);
+      setUsers(usersRes.data.map((user: User) => ({ id: user.id, name: user.name })));
       setShifts(shiftsRes.data);
-
-      if (usersRes.data.length > 0 && selectedUserId === "") {
-        setSelectedUserId(usersRes.data[0].id);
-      }
-      if (shiftsRes.data.length > 0 && selectedShiftId === "") {
-        setSelectedShiftId(shiftsRes.data[0].id);
-      }
     } catch (err) {
       console.error(err);
       setStatus("Failed to load users and shifts.");
@@ -66,83 +60,244 @@ export default function ManageShiftAssignments() {
     [shifts]
   );
 
-  const handleUpdate = async (action: "assign" | "unassign") => {
-    setStatus("");
-    if (selectedUserId === "" || selectedShiftId === "") {
-      setStatus("Please select both a user and a shift.");
+  const dayShiftOptions = useMemo(() => {
+    if (!selectedCell) return [];
+    return sortedShifts.filter(shift => shift.day_of_week === selectedCell.dayIndex);
+  }, [selectedCell, sortedShifts]);
+
+  const assignedShiftsForSelection = useMemo(() => {
+    if (!selectedCell) return [];
+    return dayShiftOptions.filter(shift => shift.staff.some(person => person.id === selectedCell.userId));
+  }, [dayShiftOptions, selectedCell]);
+
+  useEffect(() => {
+    if (!selectedCell) return;
+
+    const assignedShift = assignedShiftsForSelection[0];
+    if (assignedShift) {
+      setCurrentShiftId(assignedShift.id);
+      setStartTime(toHHMM(assignedShift.start_time));
+      setEndTime(toHHMM(assignedShift.end_time));
       return;
     }
 
+    const firstDayShift = dayShiftOptions[0];
+    setCurrentShiftId("");
+    if (firstDayShift) {
+      setStartTime(toHHMM(firstDayShift.start_time));
+      setEndTime(toHHMM(firstDayShift.end_time));
+    } else {
+      setStartTime("09:00");
+      setEndTime("17:00");
+    }
+  }, [selectedCell, assignedShiftsForSelection, dayShiftOptions]);
+
+  const ensureShiftForSelectedDay = async () => {
+    if (!selectedCell) return null;
+
+    const response = await API.post<ShiftUpsertResponse>("/roster/shifts/upsert", {
+      day_of_week: selectedCell.dayIndex,
+      start_time: startTime,
+      end_time: endTime,
+    });
+    return response.data.id;
+  };
+
+  const runAssignmentRequest = async (action: "assign" | "unassign", shiftId: number, userId: number) => {
+    await API.post(`/roster/${action}`, {
+      user_id: userId,
+      shift_id: shiftId,
+    });
+  };
+
+  const handleAdd = async () => {
+    if (!selectedCell) {
+      setStatus("Select a roster cell first.");
+      return;
+    }
+    setIsSubmitting(true);
+    setStatus("");
     try {
-      await API.post(`/roster/${action}`, {
-        user_id: selectedUserId,
-        shift_id: selectedShiftId,
-      });
-      setStatus(action === "assign" ? "User assigned to shift." : "User removed from shift.");
+      const targetShiftId = await ensureShiftForSelectedDay();
+      if (!targetShiftId) throw new Error("Missing target shift");
+
+      await runAssignmentRequest("assign", targetShiftId, selectedCell.userId);
+      setStatus("Shift added.");
       await loadData();
+      setSelectedCell(null);
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
-      setStatus(typeof detail === "string" ? detail : `Failed to ${action} user.`);
+      setStatus(typeof detail === "string" ? detail : "Failed to add shift.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  const handleRemove = async () => {
+    if (!selectedCell || currentShiftId === "") {
+      setStatus("This employee has no assigned shift on the selected day.");
+      return;
+    }
+    setIsSubmitting(true);
+    setStatus("");
+    try {
+      await runAssignmentRequest("unassign", currentShiftId, selectedCell.userId);
+      setStatus("Shift removed.");
+      await loadData();
+      setSelectedCell(null);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setStatus(typeof detail === "string" ? detail : "Failed to remove shift.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleChange = async () => {
+    if (!selectedCell || currentShiftId === "") {
+      setStatus("Select a cell where this employee already has a shift.");
+      return;
+    }
+    setIsSubmitting(true);
+    setStatus("");
+    try {
+      const targetShiftId = await ensureShiftForSelectedDay();
+      if (!targetShiftId) throw new Error("Missing target shift");
+      if (targetShiftId === currentShiftId) {
+        setStatus("Choose a different shift time to change.");
+        return;
+      }
+
+      await runAssignmentRequest("unassign", currentShiftId, selectedCell.userId);
+      await runAssignmentRequest("assign", targetShiftId, selectedCell.userId);
+      setStatus("Shift changed.");
+      await loadData();
+      setSelectedCell(null);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setStatus(typeof detail === "string" ? detail : "Failed to change shift.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const selectedUserName = selectedCell
+    ? users.find(user => user.id === selectedCell.userId)?.name ?? `User #${selectedCell.userId}`
+    : "";
+
+  const selectedCellLabel = selectedCell ? `${selectedUserName} on ${days[selectedCell.dayIndex]}` : "";
+
   return (
     <div style={{ maxWidth: 900, margin: "20px auto" }}>
-      <h2>Manual Shift Assignment</h2>
+      <h2>Manage Shifts</h2>
       {status && <p>{status}</p>}
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-        <label>
-          User{" "}
-          <select value={selectedUserId} onChange={e => setSelectedUserId(Number(e.target.value))}>
-            {users.map(user => (
-              <option key={user.id} value={user.id}>
-                {user.name}
-              </option>
-            ))}
-          </select>
-        </label>
+      <RosterTable
+        shifts={shifts}
+        employees={users}
+        title="Manage Shift Assignments"
+        subtitle="Click a day cell to open shift actions for that employee/day."
+        editable
+        selectedCell={
+          selectedCell
+            ? { employeeId: selectedCell.userId, dayIndex: selectedCell.dayIndex }
+            : null
+        }
+        onCellClick={(employeeId, dayIndex) => {
+          setSelectedCell({ userId: employeeId, dayIndex });
+          setStatus("");
+        }}
+      />
 
-        <label>
-          Shift{" "}
-          <select value={selectedShiftId} onChange={e => setSelectedShiftId(Number(e.target.value))}>
-            {sortedShifts.map(shift => (
-              <option key={shift.id} value={shift.id}>
-                {days[shift.day_of_week]} {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
-              </option>
-            ))}
-          </select>
-        </label>
+      {selectedCell && (
+        <div className="shift-modal-backdrop" role="presentation" onClick={() => setSelectedCell(null)}>
+          <section
+            className="shift-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Manage selected shift"
+            onClick={event => event.stopPropagation()}
+          >
+            <header className="shift-modal__header">
+              <h3>Manage Shift</h3>
+              <button type="button" onClick={() => setSelectedCell(null)} disabled={isSubmitting}>
+                Close
+              </button>
+            </header>
 
-        <button type="button" onClick={() => handleUpdate("assign")}>
-          Add User to Shift
-        </button>
-        <button type="button" onClick={() => handleUpdate("unassign")}>
-          Remove User from Shift
-        </button>
-      </div>
+            <p className="shift-modal__selected">{selectedCellLabel}</p>
 
-      <h3>Current Assignments</h3>
-      <table style={{ borderCollapse: "collapse", width: "100%", textAlign: "left" }}>
-        <thead>
-          <tr style={{ backgroundColor: "#f0f0f0" }}>
-            <th style={{ padding: 8 }}>Day</th>
-            <th style={{ padding: 8 }}>Time</th>
-            <th style={{ padding: 8 }}>Assigned Users</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedShifts.map(shift => (
-            <tr key={shift.id} style={{ borderBottom: "1px solid #ddd" }}>
-              <td style={{ padding: 8 }}>{days[shift.day_of_week]}</td>
-              <td style={{ padding: 8 }}>
-                {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
-              </td>
-              <td style={{ padding: 8 }}>{shift.staff.map(staff => staff.name).join(", ") || "None"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            <label>
+              Current assigned shift
+              <select
+                value={currentShiftId}
+                onChange={e => {
+                  const value = e.target.value;
+                  const parsed = value === "" ? "" : Number(value);
+                  setCurrentShiftId(parsed);
+                  if (parsed !== "") {
+                    const picked = assignedShiftsForSelection.find(shift => shift.id === parsed);
+                    if (picked) {
+                      setStartTime(toHHMM(picked.start_time));
+                      setEndTime(toHHMM(picked.end_time));
+                    }
+                  }
+                }}
+                disabled={assignedShiftsForSelection.length === 0 || isSubmitting}
+              >
+                {assignedShiftsForSelection.length === 0 ? (
+                  <option value="">No assigned shift</option>
+                ) : (
+                  assignedShiftsForSelection.map(shift => (
+                    <option key={shift.id} value={shift.id}>
+                      {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+
+            <label>
+              Start time
+              <input
+                type="time"
+                value={startTime}
+                onChange={e => setStartTime(e.target.value)}
+                disabled={isSubmitting}
+              />
+            </label>
+
+            <label>
+              End time
+              <input
+                type="time"
+                value={endTime}
+                onChange={e => setEndTime(e.target.value)}
+                disabled={isSubmitting}
+              />
+            </label>
+
+            {dayShiftOptions.length > 0 && (
+              <p className="shift-modal__hint">
+                Existing {days[selectedCell.dayIndex]} shifts:{" "}
+                {dayShiftOptions.map(shift => `${formatTime(shift.start_time)}-${formatTime(shift.end_time)}`).join(", ")}
+              </p>
+            )}
+
+            <div className="shift-modal__actions">
+              <button type="button" onClick={handleAdd} disabled={isSubmitting}>
+                Add
+              </button>
+              <button type="button" onClick={handleRemove} disabled={isSubmitting || currentShiftId === ""}>
+                Remove
+              </button>
+              <button type="button" onClick={handleChange} disabled={isSubmitting || currentShiftId === ""}>
+                Change
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

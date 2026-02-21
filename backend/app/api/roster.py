@@ -1,4 +1,4 @@
-from datetime import time
+from datetime import datetime, time
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Dict, List, Set
@@ -27,6 +27,19 @@ router = APIRouter(
 class ManualAssignmentUpdate(BaseModel):
     shift_id: int
     user_id: int
+
+
+class ShiftUpsertRequest(BaseModel):
+    day_of_week: int
+    start_time: str
+    end_time: str
+
+
+def parse_hhmm(value: str) -> time:
+    try:
+        return datetime.strptime(value, "%H:%M").time()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Time must be in HH:MM format") from exc
 
 @router.get("/debug/availability")
 def debug_availability(db: Session = Depends(get_db)):
@@ -245,6 +258,50 @@ def assign_user_to_shift(payload: ManualAssignmentUpdate, db: Session = Depends(
     db.commit()
 
     return {"status": "user assigned to shift"}
+
+
+@router.post("/shifts/upsert")
+def upsert_shift(payload: ShiftUpsertRequest, db: Session = Depends(get_db)):
+    if payload.day_of_week < 0 or payload.day_of_week > 6:
+        raise HTTPException(status_code=400, detail="day_of_week must be between 0 and 6")
+
+    start_time = parse_hhmm(payload.start_time)
+    end_time = parse_hhmm(payload.end_time)
+
+    if end_time <= start_time:
+        raise HTTPException(status_code=400, detail="end_time must be later than start_time")
+
+    existing_shift = db.query(ShiftDB).filter_by(
+        day_of_week=payload.day_of_week,
+        start_time=start_time,
+        end_time=end_time,
+    ).first()
+
+    if existing_shift:
+        return {
+            "id": existing_shift.id,
+            "day_of_week": existing_shift.day_of_week,
+            "start_time": str(existing_shift.start_time),
+            "end_time": str(existing_shift.end_time),
+            "created": False,
+        }
+
+    new_shift = ShiftDB(
+        day_of_week=payload.day_of_week,
+        start_time=start_time,
+        end_time=end_time,
+    )
+    db.add(new_shift)
+    db.commit()
+    db.refresh(new_shift)
+
+    return {
+        "id": new_shift.id,
+        "day_of_week": new_shift.day_of_week,
+        "start_time": str(new_shift.start_time),
+        "end_time": str(new_shift.end_time),
+        "created": True,
+    }
 
 
 @router.post("/unassign")

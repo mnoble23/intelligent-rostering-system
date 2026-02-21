@@ -105,6 +105,14 @@
   vertical-align: top;
 }
 
+.employee-calendar__table tbody td.employee-calendar__cell--editable {
+  cursor: pointer;
+}
+
+.employee-calendar__table tbody td[data-selected="true"] {
+  background: #eef8ff;
+}
+
 .employee-calendar__table tbody tr:nth-child(even) td,
 .employee-calendar__table tbody tr:nth-child(even) th {
   background: #fcfdff;
@@ -138,6 +146,14 @@
   padding: 5px 6px;
 }
 
+.employee-calendar__cell-button {
+  cursor: pointer;
+}
+
+.employee-calendar__cell-button-wrap {
+  cursor: pointer;
+}
+
 .employee-calendar__off {
   background: var(--off-bg);
   border: 1px dashed #c9d3dc;
@@ -147,6 +163,10 @@
   font-size: 0.78rem;
   font-weight: 700;
   padding: 4px 7px;
+}
+
+.employee-calendar__actions {
+  margin-bottom: 8px;
 }
 
 @media (max-width: 720px) {
