@@ -72,11 +72,11 @@ Frontend runs at: `http://localhost:3000`
 - Database now fully integrated
 - Connected React frontend with backend
 - Added features to React app so that a user can submit availability, generate rosters, manually manage shifts and more
+- Simplistic but nice react app design for easy navigation and use
 
 ## Next Steps
-- Improve roster generation logic so it takes more constraints into account
-- Also must change logic to ensure that roster generation is never duplicating shifts or any other issues
-- Improve react app to make it more user friendly
+- Allow multiple rosters to be generated for different weeks
+- Role based access controls
 
 ## Roster Generation Info
 **Current Version**
@@ -96,18 +96,17 @@ Frontend runs at: `http://localhost:3000`
 - Roster dashboard table to view full roster for the week
 - Page for user submission of their name, availability, min and max hours, role
 - Generate Roster button
-- Manual shift management
 - My Roster page to show a user their roster for the week
 - Shift coverage page to see what times are understaffed
 - Manager and staff roles to determine what access they have in the app (at this point, you can just pick staff or manager without authentication)
 - My profile page added for a user to look at their info such as submitted availability and assigned shifts and min and max hours per week
+- React app has been updated with much nicer design and easier to navigate
+- Manual shift management page can be used to manage shifts by selecting the employee and day to edit it
 
 **Planned Improvements:**
-- Improve manual shift management to allow staff to have a custom shift start and end time
-- React app design to be improved with better layout and nicer design
+- Role based access control
 
 ## Potential Future Upgrades
-- Role based access control
 - Allow for specific business operation times to be picked
 - Allow minimum and maximum number of staff per shift to be picked (with specific choices for given times on given days)
 - Scheduling breaks for each member of staff
@@ -118,6 +117,7 @@ Frontend runs at: `http://localhost:3000`
 - Let users rank preferred times
 - When roster generation fails, return exact reasons it has failed
 - A lot of these changes may require a change in roster generation approach, it is currently using a greedy heuristics type of model but may need to be changed to a constraint programming type of model with scoring and penalties
+- Shift swap feature
 
 ## License
 This project is licensed under the MIT License.
