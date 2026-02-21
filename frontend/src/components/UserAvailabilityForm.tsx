@@ -1,5 +1,6 @@
 import { useState } from "react";
 import API from "../services/api";
+import "./UserAvailabilityForm.css";
 
 interface Availability {
   day_of_week: number;
@@ -19,6 +20,7 @@ export default function UserAvailabilityForm() {
     { day_of_week: 0, start_time: "", end_time: "", is_full_day: false },
   ]);
   const [status, setStatus] = useState("");
+  const [statusType, setStatusType] = useState<"idle" | "success" | "error">("idle");
 
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -68,27 +70,33 @@ export default function UserAvailabilityForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus("");
+    setStatusType("idle");
 
     if (!name.trim()) {
       setStatus("Please enter a name.");
+      setStatusType("error");
       return;
     }
     if (minHours < 0 || maxHours < 0) {
       setStatus("Minimum and maximum hours must be zero or greater.");
+      setStatusType("error");
       return;
     }
     if (maxHours < minHours) {
       setStatus("Maximum hours must be greater than or equal to minimum hours.");
+      setStatusType("error");
       return;
     }
 
     for (const av of availability) {
       if (!av.start_time || !av.end_time) {
         setStatus("All availability rows must have start and end times.");
+        setStatusType("error");
         return;
       }
       if (av.start_time >= av.end_time) {
         setStatus("Start time must be before end time.");
+        setStatusType("error");
         return;
       }
     }
@@ -103,17 +111,18 @@ export default function UserAvailabilityForm() {
       const userId = userRes.data.id;
 
       const payload = {
-      availabilities: availability.map(av => ({
-        user_id: userId,
-        day_of_week: av.day_of_week,
-        start_time: av.start_time + ":00",
-        end_time: av.end_time + ":00"
-      }))
-    };
+        availabilities: availability.map(av => ({
+          user_id: userId,
+          day_of_week: av.day_of_week,
+          start_time: av.start_time + ":00",
+          end_time: av.end_time + ":00",
+        })),
+      };
 
       await API.post("/availability/bulk", payload);
 
       setStatus(`User "${name}" and availability submitted successfully!`);
+      setStatusType("success");
       setName("");
       setRole("staff");
       setMinHours(0);
@@ -122,117 +131,133 @@ export default function UserAvailabilityForm() {
     } catch (err) {
       console.error(err);
       setStatus("Failed to submit. Check console for details.");
+      setStatusType("error");
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ maxWidth: 600, margin: "20px auto" }}>
-      <h2>User & Availability Submission</h2>
+    <section className="availability-form">
+      <form onSubmit={handleSubmit} className="availability-form__shell">
+        <header className="availability-form__hero">
+          <p className="availability-form__eyebrow">Intake</p>
+          <h2>User & Availability Submission</h2>
+          <p className="availability-form__lead">
+            Capture staffing details and weekly availability blocks in one clean workflow.
+          </p>
+        </header>
 
-      {status && <p style={{ color: status.startsWith("Failed") ? "red" : "green" }}>{status}</p>}
+        {status && <p className={`availability-form__status availability-form__status--${statusType}`}>{status}</p>}
 
-      <div style={{ marginBottom: 10 }}>
-        <label>
-          Name:{" "}
-          <input
-            type="text"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            required
-            style={{ width: "100%", padding: 6 }}
-          />
-        </label>
-      </div>
-      <div style={{ marginBottom: 10 }}>
-        <label>
-          Role:{" "}
-          <select
-            value={role}
-            onChange={e => setRole(e.target.value as "staff" | "manager")}
-            style={{ width: "100%", padding: 6 }}
-          >
-            <option value="staff">Staff</option>
-            <option value="manager">Manager</option>
-          </select>
-        </label>
-      </div>
-      <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-        <label>
-          Min Weekly Hours:{" "}
-          <input
-            type="number"
-            min={0}
-            step={0.5}
-            value={minHours}
-            onChange={e => setMinHours(Number(e.target.value))}
-            style={{ width: 110, padding: 6 }}
-          />
-        </label>
-        <label>
-          Max Weekly Hours:{" "}
-          <input
-            type="number"
-            min={0}
-            step={0.5}
-            value={maxHours}
-            onChange={e => setMaxHours(Number(e.target.value))}
-            style={{ width: 110, padding: 6 }}
-          />
-        </label>
-      </div>
-
-      <h3>Availability</h3>
-      {availability.map((av, i) => (
-        <div
-          key={i}
-          style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "center" }}
-        >
-          <select
-            value={av.day_of_week}
-            onChange={e => updateAvailability(i, "day_of_week", +e.target.value)}
-          >
-            {days.map((day, idx) => (
-              <option key={idx} value={idx}>{day}</option>
-            ))}
-          </select>
-
-          <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <div className="availability-form__grid">
+          <label className="availability-form__field">
+            <span>Name</span>
             <input
-              type="checkbox"
-              checked={av.is_full_day}
-              onChange={e => toggleFullDayAvailability(i, e.target.checked)}
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              required
             />
-            Fully Available
           </label>
-
-          <input
-            type="time"
-            value={av.start_time}
-            onChange={e => updateAvailability(i, "start_time", e.target.value)}
-            required
-            disabled={av.is_full_day}
-          />
-          <input
-            type="time"
-            value={av.end_time}
-            onChange={e => updateAvailability(i, "end_time", e.target.value)}
-            required
-            disabled={av.is_full_day}
-          />
-
-          {availability.length > 1 && (
-            <button type="button" onClick={() => removeAvailability(i)}>Remove</button>
-          )}
+          <label className="availability-form__field">
+            <span>Role</span>
+            <select
+              value={role}
+              onChange={e => setRole(e.target.value as "staff" | "manager")}
+            >
+              <option value="staff">Staff</option>
+              <option value="manager">Manager</option>
+            </select>
+          </label>
+          <label className="availability-form__field">
+            <span>Min Weekly Hours</span>
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              value={minHours}
+              onChange={e => setMinHours(Number(e.target.value))}
+            />
+          </label>
+          <label className="availability-form__field">
+            <span>Max Weekly Hours</span>
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              value={maxHours}
+              onChange={e => setMaxHours(Number(e.target.value))}
+            />
+          </label>
         </div>
-      ))}
 
-      <button type="button" onClick={addAvailability} style={{ marginBottom: 10 }}>
-        + Add Availability
-      </button>
+        <section className="availability-form__availability">
+          <div className="availability-form__availability-head">
+            <h3>Availability Blocks</h3>
+            <button type="button" onClick={addAvailability} className="availability-form__add-button">
+              + Add Availability
+            </button>
+          </div>
 
-      <div>
-        <button type="submit">Submit</button>
-      </div>
-    </form>
+          <div className="availability-form__rows">
+            {availability.map((av, i) => (
+              <div key={i} className="availability-row">
+                <label className="availability-row__field">
+                  <span>Day</span>
+                  <select
+                    value={av.day_of_week}
+                    onChange={e => updateAvailability(i, "day_of_week", +e.target.value)}
+                  >
+                    {days.map((day, idx) => (
+                      <option key={idx} value={idx}>{day}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="availability-row__toggle">
+                  <input
+                    type="checkbox"
+                    checked={av.is_full_day}
+                    onChange={e => toggleFullDayAvailability(i, e.target.checked)}
+                  />
+                  Fully Available
+                </label>
+
+                <label className="availability-row__field">
+                  <span>Start</span>
+                  <input
+                    type="time"
+                    value={av.start_time}
+                    onChange={e => updateAvailability(i, "start_time", e.target.value)}
+                    required
+                    disabled={av.is_full_day}
+                  />
+                </label>
+
+                <label className="availability-row__field">
+                  <span>End</span>
+                  <input
+                    type="time"
+                    value={av.end_time}
+                    onChange={e => updateAvailability(i, "end_time", e.target.value)}
+                    required
+                    disabled={av.is_full_day}
+                  />
+                </label>
+
+                {availability.length > 1 && (
+                  <button type="button" onClick={() => removeAvailability(i)} className="availability-row__remove">
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="availability-form__actions">
+          <button type="submit" className="availability-form__submit">Submit Availability</button>
+        </div>
+      </form>
+    </section>
   );
 }
