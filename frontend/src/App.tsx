@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from "react
 import { type ReactElement, useCallback, useEffect, useState } from "react";
 import "./App.css";
 
-import API, { loadStoredAuthToken, setAuthErrorHandlers, setAuthToken } from "./services/api";
+import API, { setAuthErrorHandlers, setAuthToken } from "./services/api";
 import RosterTable from "./components/RosterTable";
 import UserAvailabilityForm from "./components/UserAvailabilityForm";
 import GenerateRoster from "./components/GenerateRoster";
@@ -86,24 +86,6 @@ export default function App() {
     return () => setAuthErrorHandlers({});
   }, [clearAuth]);
 
-  const loadSession = useCallback(async () => {
-    const token = loadStoredAuthToken();
-    if (!token) {
-      setAuthReady(true);
-      return;
-    }
-    try {
-      const response = await API.get<AuthUser>("/auth/me");
-      setAuthUser(response.data);
-      setAuthzMessage("");
-    } catch (err) {
-      console.error(err);
-      clearAuth();
-    } finally {
-      setAuthReady(true);
-    }
-  }, [clearAuth]);
-
   const fetchRoster = useCallback(() => {
     if (!authUser) return;
     API.get("/roster", selectedWeek ? { params: { week_start_date: selectedWeek } } : undefined)
@@ -133,8 +115,9 @@ export default function App() {
   }, [authUser, clearAuth]);
 
   useEffect(() => {
-    loadSession();
-  }, [loadSession]);
+    clearAuth();
+    setAuthReady(true);
+  }, [clearAuth]);
 
   useEffect(() => {
     if (!authUser) return;

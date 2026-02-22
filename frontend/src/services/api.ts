@@ -29,11 +29,6 @@ export function setAuthErrorHandlers(handlers: AuthErrorHandlers) {
   authErrorHandlers = handlers;
 }
 
-const initialToken = loadStoredAuthToken();
-if (initialToken) {
-  API.defaults.headers.common.Authorization = `Bearer ${initialToken}`;
-}
-
 API.interceptors.response.use(
   response => response,
   error => {
