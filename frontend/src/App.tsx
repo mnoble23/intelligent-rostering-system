@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from "react
 import { type ReactElement, useCallback, useEffect, useState } from "react";
 import "./App.css";
 
-import API, { loadStoredAuthToken, setAuthToken } from "./services/api";
+import API, { loadStoredAuthToken, setAuthErrorHandlers, setAuthToken } from "./services/api";
 import RosterTable from "./components/RosterTable";
 import UserAvailabilityForm from "./components/UserAvailabilityForm";
 import GenerateRoster from "./components/GenerateRoster";
@@ -62,6 +62,7 @@ function RoleGate({ role, allowedRoles, children }: RoleGateProps) {
 export default function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [authzMessage, setAuthzMessage] = useState("");
   const [shifts, setShifts] = useState<any[]>([]);
   const [availableWeeks, setAvailableWeeks] = useState<string[]>([]);
   const [selectedWeek, setSelectedWeek] = useState<string>("");
@@ -71,10 +72,19 @@ export default function App() {
   const clearAuth = useCallback(() => {
     setAuthToken(null);
     setAuthUser(null);
+    setAuthzMessage("");
     setShifts([]);
     setAvailableWeeks([]);
     setSelectedWeek("");
   }, []);
+
+  useEffect(() => {
+    setAuthErrorHandlers({
+      onUnauthorized: () => clearAuth(),
+      onForbidden: () => setAuthzMessage("You are not authorized to perform that action."),
+    });
+    return () => setAuthErrorHandlers({});
+  }, [clearAuth]);
 
   const loadSession = useCallback(async () => {
     const token = loadStoredAuthToken();
@@ -85,6 +95,7 @@ export default function App() {
     try {
       const response = await API.get<AuthUser>("/auth/me");
       setAuthUser(response.data);
+      setAuthzMessage("");
     } catch (err) {
       console.error(err);
       clearAuth();
@@ -143,7 +154,10 @@ export default function App() {
     );
   }
 
-  if (!role) return <Login onLoginSuccess={setAuthUser} />;
+  if (!role) return <Login onLoginSuccess={user => {
+    setAuthUser(user);
+    setAuthzMessage("");
+  }} />;
 
   const navItems =
     role === "manager"
@@ -211,6 +225,7 @@ export default function App() {
         </aside>
 
         <main className="app-content">
+          {authzMessage && <p className="app-content__notice">{authzMessage}</p>}
           <Routes>
             <Route
               path="/"
