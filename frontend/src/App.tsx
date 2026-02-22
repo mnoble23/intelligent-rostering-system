@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from "react
 import { type ReactElement, useCallback, useEffect, useState } from "react";
 import "./App.css";
 
-import API from "./services/api";
+import API, { loadStoredAuthToken, setAuthToken } from "./services/api";
 import RosterTable from "./components/RosterTable";
 import UserAvailabilityForm from "./components/UserAvailabilityForm";
 import GenerateRoster from "./components/GenerateRoster";
@@ -12,6 +12,7 @@ import RemoveUser from "./components/RemoveUser";
 import MyRoster from "./components/MyRoster";
 import ShiftCoverage from "./components/ShiftCoverage";
 import MyProfile from "./components/MyProfile";
+import Login from "./components/Login";
 
 interface DashboardPageProps {
   shifts: any[];
@@ -19,6 +20,13 @@ interface DashboardPageProps {
 }
 
 type AppRole = "manager" | "staff";
+
+interface AuthUser {
+  id: number;
+  name: string;
+  role: AppRole;
+  is_active: boolean;
+}
 
 function formatWeekOption(weekStartDate: string) {
   const [year, month, day] = weekStartDate.split("-").map(Number);
@@ -52,21 +60,51 @@ function RoleGate({ role, allowedRoles, children }: RoleGateProps) {
 }
 
 export default function App() {
-  const [role, setRole] = useState<AppRole | null>(() => {
-    const saved = localStorage.getItem("app_role");
-    return saved === "manager" || saved === "staff" ? saved : null;
-  });
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [shifts, setShifts] = useState<any[]>([]);
   const [availableWeeks, setAvailableWeeks] = useState<string[]>([]);
   const [selectedWeek, setSelectedWeek] = useState<string>("");
 
+  const role = authUser?.role ?? null;
+
+  const clearAuth = useCallback(() => {
+    setAuthToken(null);
+    setAuthUser(null);
+    setShifts([]);
+    setAvailableWeeks([]);
+    setSelectedWeek("");
+  }, []);
+
+  const loadSession = useCallback(async () => {
+    const token = loadStoredAuthToken();
+    if (!token) {
+      setAuthReady(true);
+      return;
+    }
+    try {
+      const response = await API.get<AuthUser>("/auth/me");
+      setAuthUser(response.data);
+    } catch (err) {
+      console.error(err);
+      clearAuth();
+    } finally {
+      setAuthReady(true);
+    }
+  }, [clearAuth]);
+
   const fetchRoster = useCallback(() => {
+    if (!authUser) return;
     API.get("/roster", selectedWeek ? { params: { week_start_date: selectedWeek } } : undefined)
       .then(res => setShifts(res.data))
-      .catch(err => console.error(err));
-  }, [selectedWeek]);
+      .catch(err => {
+        console.error(err);
+        if (err?.response?.status === 401) clearAuth();
+      });
+  }, [authUser, clearAuth, selectedWeek]);
 
   const fetchWeeks = useCallback(() => {
+    if (!authUser) return;
     API.get<string[]>("/roster/weeks")
       .then(res => {
         const weeks = res.data ?? [];
@@ -77,43 +115,35 @@ export default function App() {
           return weeks[0];
         });
       })
-      .catch(err => console.error(err));
-  }, []);
+      .catch(err => {
+        console.error(err);
+        if (err?.response?.status === 401) clearAuth();
+      });
+  }, [authUser, clearAuth]);
 
   useEffect(() => {
+    loadSession();
+  }, [loadSession]);
+
+  useEffect(() => {
+    if (!authUser) return;
     fetchWeeks();
-  }, [fetchWeeks]);
+  }, [authUser, fetchWeeks]);
 
   useEffect(() => {
+    if (!authUser) return;
     fetchRoster();
-  }, [fetchRoster]);
+  }, [authUser, fetchRoster]);
 
-  const setAndPersistRole = (nextRole: AppRole) => {
-    setRole(nextRole);
-    localStorage.setItem("app_role", nextRole);
-  };
-
-  const clearRole = () => {
-    setRole(null);
-    localStorage.removeItem("app_role");
-  };
-
-  if (!role) {
+  if (!authReady) {
     return (
       <main style={{ maxWidth: 560, margin: "80px auto", padding: 20 }}>
-        <h1 style={{ marginTop: 0 }}>Who are you?</h1>
-        <p>Select a role to continue. You can switch later from the top bar.</p>
-        <div style={{ display: "flex", gap: 12 }}>
-          <button type="button" onClick={() => setAndPersistRole("manager")}>
-            I am a Manager
-          </button>
-          <button type="button" onClick={() => setAndPersistRole("staff")}>
-            I am Staff
-          </button>
-        </div>
+        <h1 style={{ marginTop: 0 }}>Loading session...</h1>
       </main>
     );
   }
+
+  if (!role) return <Login onLoginSuccess={setAuthUser} />;
 
   const navItems =
     role === "manager"
@@ -174,8 +204,8 @@ export default function App() {
             </select>
           </div>
           <div className="app-sidebar__footer">
-            <button type="button" className="app-sidebar__switch" onClick={clearRole}>
-              Switch Role
+            <button type="button" className="app-sidebar__switch" onClick={clearAuth}>
+              Sign Out
             </button>
           </div>
         </aside>
