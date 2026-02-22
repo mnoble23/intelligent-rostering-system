@@ -206,7 +206,6 @@ def generate_roster(
 def get_roster(
     week_start_date: date | None = None,
     db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user),
 ) -> List[Dict]:
     resolved_week_start = resolve_week_start(db, week_start_date)
     if resolved_week_start is None:
@@ -225,14 +224,9 @@ def get_roster(
 
         staff = []
         for a in assignments:
-            if current_user.role != "manager" and a.user_id != current_user.id:
-                continue
             user = db.query(UserDB).get(a.user_id)
             if user:
                 staff.append({"id": user.id, "name": user.name})
-
-        if current_user.role != "manager" and not staff:
-            continue
 
         roster.append({
             "id": shift.id,
@@ -249,21 +243,9 @@ def get_roster(
 @router.get("/weeks")
 def get_available_roster_weeks(
     db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user),
 ) -> List[str]:
-    if current_user.role == "manager":
-        weeks = (
-            db.query(ShiftDB.week_start_date)
-            .distinct()
-            .order_by(ShiftDB.week_start_date.desc())
-            .all()
-        )
-        return [week_start.isoformat() for (week_start,) in weeks]
-
     weeks = (
         db.query(ShiftDB.week_start_date)
-        .join(ShiftAssignmentDB, ShiftAssignmentDB.shift_id == ShiftDB.id)
-        .filter(ShiftAssignmentDB.user_id == current_user.id)
         .distinct()
         .order_by(ShiftDB.week_start_date.desc())
         .all()
