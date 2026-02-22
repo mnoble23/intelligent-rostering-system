@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+import os
+
+from app.auth_utils import hash_password
 from app.db.session import get_db
 from app.models.availability_db import AvailabilityDB
 from app.models.shift_assignment_db import ShiftAssignmentDB
@@ -22,6 +25,7 @@ def get_users(db: Session = Depends(get_db)):
             "role": user.role,
             "min_hours": user.min_hours,
             "max_hours": user.max_hours,
+            "is_active": user.is_active,
         }
         for user in users
     ]
@@ -30,12 +34,17 @@ def get_users(db: Session = Depends(get_db)):
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     normalized_name = user.name.strip()
     normalized_role = user.role.strip().lower()
+    raw_password = (user.password or "").strip()
+    default_password = os.getenv("DEFAULT_USER_PASSWORD", "ChangeMe123!")
+
     if not normalized_name:
         raise HTTPException(status_code=400, detail="Name is required")
     if normalized_role not in {"manager", "staff"}:
         raise HTTPException(status_code=400, detail="role must be 'manager' or 'staff'")
     if user.max_hours < user.min_hours:
         raise HTTPException(status_code=400, detail="max_hours must be greater than or equal to min_hours")
+    if raw_password and len(raw_password) < 8:
+        raise HTTPException(status_code=400, detail="password must be at least 8 characters")
 
     existing_user = (
         db.query(UserDB)
@@ -46,15 +55,21 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
         existing_user.role = normalized_role
         existing_user.min_hours = user.min_hours
         existing_user.max_hours = user.max_hours
+        existing_user.is_active = True
+        if raw_password:
+            existing_user.password_hash = hash_password(raw_password)
         db.commit()
         db.refresh(existing_user)
         return existing_user
 
+    password_to_store = raw_password or default_password
     db_user = UserDB(
         name=normalized_name,
         role=normalized_role,
         min_hours=user.min_hours,
         max_hours=user.max_hours,
+        password_hash=hash_password(password_to_store),
+        is_active=True,
     )
     db.add(db_user)
     db.commit()
