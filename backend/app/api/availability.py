@@ -4,11 +4,13 @@ from typing import List
 
 from app.schemas.availability import AvailabilityCreate, AvailabilityResponse, AvailabilityBulkCreate
 from app.models.availability_db import AvailabilityDB
+from app.api.auth import get_current_user
 from app.db.session import get_db
 
 router = APIRouter(
     prefix="/availability",
-    tags=["Availability"]
+    tags=["Availability"],
+    dependencies=[Depends(get_current_user)],
 )
 
 @router.post("/", response_model=AvailabilityResponse)

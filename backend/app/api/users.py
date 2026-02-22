@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 import os
 
 from app.auth_utils import hash_password
-from app.api.auth import require_manager
+from app.api.auth import get_current_user, require_manager
 from app.db.session import get_db
 from app.models.availability_db import AvailabilityDB
 from app.models.shift_assignment_db import ShiftAssignmentDB
@@ -13,7 +13,8 @@ from app.schemas.user import UserCreate, UserRead
 
 router = APIRouter(
     prefix="/users",
-    tags=["Users"]
+    tags=["Users"],
+    dependencies=[Depends(get_current_user)],
 )
 
 @router.get("/")

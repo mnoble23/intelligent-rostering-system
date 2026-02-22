@@ -6,7 +6,7 @@ from typing import Dict, List, Set
 from pydantic import BaseModel, Field
 
 from app.db.session import get_db
-from app.api.auth import require_manager
+from app.api.auth import get_current_user, require_manager
 from app.services.availability_loader import load_weekly_availability
 from app.services.roster_generator import (
     BUSINESS_END,
@@ -22,7 +22,8 @@ from app.models.user_db import UserDB
 
 router = APIRouter(
     prefix="/roster",
-    tags=["Roster"]
+    tags=["Roster"],
+    dependencies=[Depends(get_current_user)],
 )
 
 
