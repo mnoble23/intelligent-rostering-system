@@ -18,7 +18,22 @@ router = APIRouter(
 )
 
 @router.get("/")
-def get_users(db: Session = Depends(get_db)):
+def get_users(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+):
+    if current_user.role != "manager":
+        return [
+            {
+                "id": current_user.id,
+                "name": current_user.name,
+                "role": current_user.role,
+                "min_hours": current_user.min_hours,
+                "max_hours": current_user.max_hours,
+                "is_active": current_user.is_active,
+            }
+        ]
+
     users = db.query(UserDB).all()
     return [
         {
@@ -33,7 +48,11 @@ def get_users(db: Session = Depends(get_db)):
     ]
 
 @router.post("/", response_model=UserRead)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
+def create_user(
+    user: UserCreate,
+    db: Session = Depends(get_db),
+    _current_user: UserDB = Depends(require_manager),
+):
     normalized_name = user.name.strip()
     normalized_role = user.role.strip().lower()
     raw_password = (user.password or "").strip()

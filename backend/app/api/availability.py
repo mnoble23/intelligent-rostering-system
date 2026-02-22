@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 
+from app.api.auth import get_current_user
+from app.models.user_db import UserDB
 from app.schemas.availability import AvailabilityCreate, AvailabilityResponse, AvailabilityBulkCreate
 from app.models.availability_db import AvailabilityDB
-from app.api.auth import get_current_user
 from app.db.session import get_db
 
 router = APIRouter(
@@ -16,8 +17,12 @@ router = APIRouter(
 @router.post("/", response_model=AvailabilityResponse)
 def create_availability(
     availability: AvailabilityCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
 ):
+    if current_user.role != "manager" and availability.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only manage your own availability")
+
     if availability.end_time <= availability.start_time:
         raise HTTPException(
             status_code=400,
@@ -47,12 +52,15 @@ def create_availability(
 @router.post("/bulk", response_model=List[AvailabilityResponse])
 def create_availabilities_bulk(
     bulk: AvailabilityBulkCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
 ):
     if not bulk.availabilities:
         raise HTTPException(status_code=400, detail="At least one availability entry is required")
 
     user_ids = {entry.user_id for entry in bulk.availabilities}
+    if current_user.role != "manager" and any(user_id != current_user.id for user_id in user_ids):
+        raise HTTPException(status_code=403, detail="You can only manage your own availability")
     db.query(AvailabilityDB).filter(AvailabilityDB.user_id.in_(user_ids)).delete(synchronize_session=False)
     db.commit()
 
@@ -88,5 +96,11 @@ def create_availabilities_bulk(
     return created_entries
 
 @router.get("/", response_model=list[AvailabilityResponse])
-def list_availability(db: Session = Depends(get_db)):
-    return db.query(AvailabilityDB).all()
+def list_availability(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+):
+    query = db.query(AvailabilityDB)
+    if current_user.role != "manager":
+        query = query.filter_by(user_id=current_user.id)
+    return query.all()
