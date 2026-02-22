@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 import os
 
 from app.auth_utils import hash_password
+from app.api.auth import require_manager
 from app.db.session import get_db
 from app.models.availability_db import AvailabilityDB
 from app.models.shift_assignment_db import ShiftAssignmentDB
@@ -78,7 +79,11 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.delete("/{user_id}")
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _current_user: UserDB = Depends(require_manager),
+):
     user = db.query(UserDB).filter_by(id=user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

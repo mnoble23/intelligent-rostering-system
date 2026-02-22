@@ -6,6 +6,7 @@ from typing import Dict, List, Set
 from pydantic import BaseModel, Field
 
 from app.db.session import get_db
+from app.api.auth import require_manager
 from app.services.availability_loader import load_weekly_availability
 from app.services.roster_generator import (
     BUSINESS_END,
@@ -148,7 +149,11 @@ def debug_assigned_shifts(db: Session = Depends(get_db)):
 
 
 @router.post("/generate")
-def generate_roster(payload: GenerateRosterRequest = GenerateRosterRequest(), db: Session = Depends(get_db)):
+def generate_roster(
+    payload: GenerateRosterRequest = GenerateRosterRequest(),
+    db: Session = Depends(get_db),
+    _current_user: UserDB = Depends(require_manager),
+):
     weekly_availability = load_weekly_availability(db)
     users = db.query(UserDB).all()
     user_hour_limits = {
@@ -234,7 +239,11 @@ def get_available_roster_weeks(db: Session = Depends(get_db)) -> List[str]:
 
 
 @router.delete("/week/{week_start_date}")
-def delete_roster_week(week_start_date: date, db: Session = Depends(get_db)):
+def delete_roster_week(
+    week_start_date: date,
+    db: Session = Depends(get_db),
+    _current_user: UserDB = Depends(require_manager),
+):
     resolved_week_start = get_week_start(week_start_date)
 
     shifts = db.query(ShiftDB).filter_by(week_start_date=resolved_week_start).all()
@@ -346,7 +355,11 @@ def get_shift_coverage(week_start_date: date | None = None, db: Session = Depend
 
 
 @router.post("/assign")
-def assign_user_to_shift(payload: ManualAssignmentUpdate, db: Session = Depends(get_db)):
+def assign_user_to_shift(
+    payload: ManualAssignmentUpdate,
+    db: Session = Depends(get_db),
+    _current_user: UserDB = Depends(require_manager),
+):
     shift = db.query(ShiftDB).filter_by(id=payload.shift_id).first()
     if not shift:
         raise HTTPException(status_code=404, detail="Shift not found")
@@ -370,7 +383,11 @@ def assign_user_to_shift(payload: ManualAssignmentUpdate, db: Session = Depends(
 
 
 @router.post("/shifts/upsert")
-def upsert_shift(payload: ShiftUpsertRequest, db: Session = Depends(get_db)):
+def upsert_shift(
+    payload: ShiftUpsertRequest,
+    db: Session = Depends(get_db),
+    _current_user: UserDB = Depends(require_manager),
+):
     if payload.day_of_week < 0 or payload.day_of_week > 6:
         raise HTTPException(status_code=400, detail="day_of_week must be between 0 and 6")
 
@@ -422,7 +439,11 @@ def upsert_shift(payload: ShiftUpsertRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/unassign")
-def unassign_user_from_shift(payload: ManualAssignmentUpdate, db: Session = Depends(get_db)):
+def unassign_user_from_shift(
+    payload: ManualAssignmentUpdate,
+    db: Session = Depends(get_db),
+    _current_user: UserDB = Depends(require_manager),
+):
     assignment = db.query(ShiftAssignmentDB).filter_by(
         shift_id=payload.shift_id,
         user_id=payload.user_id,
