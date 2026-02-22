@@ -58,6 +58,12 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     return user
 
 
+def require_manager(current_user: UserDB = Depends(get_current_user)) -> UserDB:
+    if current_user.role != "manager":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Manager role required")
+    return current_user
+
+
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     normalized_name = payload.name.strip()
