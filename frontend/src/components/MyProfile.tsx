@@ -31,6 +31,11 @@ interface Shift {
   staff: Staff[];
 }
 
+interface AuthUser {
+  id: number;
+  name: string;
+}
+
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 interface MyProfileProps {
@@ -71,17 +76,19 @@ export default function MyProfile({ weekStartDate }: MyProfileProps) {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [usersRes, availabilityRes, rosterRes] = await Promise.all([
+        const [usersRes, availabilityRes, rosterRes, meRes] = await Promise.all([
           API.get("/users"),
           API.get("/availability"),
           API.get("/roster", weekStartDate ? { params: { week_start_date: weekStartDate } } : undefined),
+          API.get<AuthUser>("/auth/me"),
         ]);
 
-        setUsers([...usersRes.data].sort((a, b) => a.name.localeCompare(b.name)));
+        const sortedUsers = [...usersRes.data].sort((a, b) => a.name.localeCompare(b.name));
+        setUsers(sortedUsers);
         setAvailability(availabilityRes.data);
         setShifts(rosterRes.data);
-        setSelectedUserId("");
-        setUserSearch("");
+        setSelectedUserId(meRes.data.id);
+        setUserSearch(meRes.data.name);
       } catch (err) {
         console.error(err);
         setStatus("Failed to load profile data.");
