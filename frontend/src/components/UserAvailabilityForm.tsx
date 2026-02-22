@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import API from "../services/api";
 import "./UserAvailabilityForm.css";
 
@@ -7,6 +7,12 @@ interface Availability {
   start_time: string;
   end_time: string;
   is_full_day: boolean;
+}
+
+interface AuthUser {
+  id: number;
+  name: string;
+  role: "staff" | "manager";
 }
 
 export default function UserAvailabilityForm() {
@@ -19,10 +25,27 @@ export default function UserAvailabilityForm() {
   const [availability, setAvailability] = useState<Availability[]>([
     { day_of_week: 0, start_time: "", end_time: "", is_full_day: false },
   ]);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState("");
   const [statusType, setStatusType] = useState<"idle" | "success" | "error">("idle");
 
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  useEffect(() => {
+    API.get<AuthUser>("/auth/me")
+      .then(response => {
+        setAuthUser(response.data);
+        if (response.data.role === "staff") {
+          setName(response.data.name);
+          setRole("staff");
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        setStatus("Failed to load authenticated user.");
+        setStatusType("error");
+      });
+  }, []);
 
   const addAvailability = () => {
     setAvailability([
@@ -102,13 +125,24 @@ export default function UserAvailabilityForm() {
     }
 
     try {
-      const userRes = await API.post("/users", {
-        name,
-        role,
-        min_hours: minHours,
-        max_hours: maxHours,
-      });
-      const userId = userRes.data.id;
+      let userId: number | null = null;
+      if (authUser?.role === "manager") {
+        const userRes = await API.post("/users", {
+          name,
+          role,
+          min_hours: minHours,
+          max_hours: maxHours,
+        });
+        userId = userRes.data.id;
+      } else {
+        userId = authUser?.id ?? null;
+      }
+
+      if (!userId) {
+        setStatus("Unable to resolve user identity.");
+        setStatusType("error");
+        return;
+      }
 
       const payload = {
         availabilities: availability.map(av => ({
@@ -121,12 +155,16 @@ export default function UserAvailabilityForm() {
 
       await API.post("/availability/bulk", payload);
 
-      setStatus(`User "${name}" and availability submitted successfully!`);
+      setStatus(authUser?.role === "manager"
+        ? `User "${name}" and availability submitted successfully!`
+        : "Availability submitted successfully!");
       setStatusType("success");
-      setName("");
-      setRole("staff");
-      setMinHours(0);
-      setMaxHours(40);
+      if (authUser?.role === "manager") {
+        setName("");
+        setRole("staff");
+        setMinHours(0);
+        setMaxHours(40);
+      }
       setAvailability([{ day_of_week: 0, start_time: "", end_time: "", is_full_day: false }]);
     } catch (err) {
       console.error(err);
@@ -149,45 +187,54 @@ export default function UserAvailabilityForm() {
         {status && <p className={`availability-form__status availability-form__status--${statusType}`}>{status}</p>}
 
         <div className="availability-form__grid">
-          <label className="availability-form__field">
-            <span>Name</span>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              required
-            />
-          </label>
-          <label className="availability-form__field">
-            <span>Role</span>
-            <select
-              value={role}
-              onChange={e => setRole(e.target.value as "staff" | "manager")}
-            >
-              <option value="staff">Staff</option>
-              <option value="manager">Manager</option>
-            </select>
-          </label>
-          <label className="availability-form__field">
-            <span>Min Weekly Hours</span>
-            <input
-              type="number"
-              min={0}
-              step={0.5}
-              value={minHours}
-              onChange={e => setMinHours(Number(e.target.value))}
-            />
-          </label>
-          <label className="availability-form__field">
-            <span>Max Weekly Hours</span>
-            <input
-              type="number"
-              min={0}
-              step={0.5}
-              value={maxHours}
-              onChange={e => setMaxHours(Number(e.target.value))}
-            />
-          </label>
+          {authUser?.role === "manager" ? (
+            <>
+              <label className="availability-form__field">
+                <span>Name</span>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  required
+                />
+              </label>
+              <label className="availability-form__field">
+                <span>Role</span>
+                <select
+                  value={role}
+                  onChange={e => setRole(e.target.value as "staff" | "manager")}
+                >
+                  <option value="staff">Staff</option>
+                  <option value="manager">Manager</option>
+                </select>
+              </label>
+              <label className="availability-form__field">
+                <span>Min Weekly Hours</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={minHours}
+                  onChange={e => setMinHours(Number(e.target.value))}
+                />
+              </label>
+              <label className="availability-form__field">
+                <span>Max Weekly Hours</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={maxHours}
+                  onChange={e => setMaxHours(Number(e.target.value))}
+                />
+              </label>
+            </>
+          ) : (
+            <label className="availability-form__field">
+              <span>Logged in as</span>
+              <input type="text" value={authUser?.name ?? ""} disabled />
+            </label>
+          )}
         </div>
 
         <section className="availability-form__availability">
