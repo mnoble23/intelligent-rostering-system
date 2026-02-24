@@ -26,6 +26,7 @@ class AuthUserResponse(BaseModel):
     name: str
     role: str
     is_active: bool
+    workplace_id: int
 
 
 class LoginResponse(BaseModel):
@@ -36,7 +37,7 @@ class LoginResponse(BaseModel):
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> UserDB:
     payload = decode_access_token(token)
-    if not payload or "sub" not in payload:
+    if not payload or "sub" not in payload or "workplace_id" not in payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token",
@@ -44,6 +45,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
     try:
         user_id = int(payload["sub"])
+        token_workplace_id = int(payload["workplace_id"])
     except (TypeError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -53,6 +55,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     user = db.query(UserDB).filter_by(id=user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if user.workplace_id != token_workplace_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token workplace mismatch")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
     return user
@@ -79,8 +83,14 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid name or password")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
+    if user.workplace_id is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User workplace is not set")
 
-    access_token = create_access_token(user_id=user.id, role=user.role)
+    access_token = create_access_token(
+        user_id=user.id,
+        role=user.role,
+        workplace_id=user.workplace_id,
+    )
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -89,6 +99,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             "name": user.name,
             "role": user.role,
             "is_active": user.is_active,
+            "workplace_id": user.workplace_id,
         },
     }
 
@@ -100,4 +111,5 @@ def get_me(current_user: UserDB = Depends(get_current_user)):
         "name": current_user.name,
         "role": current_user.role,
         "is_active": current_user.is_active,
+        "workplace_id": current_user.workplace_id,
     }

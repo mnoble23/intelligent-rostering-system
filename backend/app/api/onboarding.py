@@ -28,6 +28,7 @@ class AuthUserResponse(BaseModel):
     name: str
     role: str
     is_active: bool
+    workplace_id: int
 
 
 class CreateWorkplaceResponse(BaseModel):
@@ -76,7 +77,11 @@ def create_workplace(payload: CreateWorkplaceRequest, db: Session = Depends(get_
     db.commit()
     db.refresh(manager)
 
-    access_token = create_access_token(user_id=manager.id, role=manager.role)
+    access_token = create_access_token(
+        user_id=manager.id,
+        role=manager.role,
+        workplace_id=workplace.id,
+    )
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -85,5 +90,6 @@ def create_workplace(payload: CreateWorkplaceRequest, db: Session = Depends(get_
             "name": manager.name,
             "role": manager.role,
             "is_active": manager.is_active,
+            "workplace_id": workplace.id,
         },
     }
