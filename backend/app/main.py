@@ -1,20 +1,25 @@
+from datetime import date, timedelta
+import os
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
-from app.api import users, availability, roster, auth, onboarding
+
+from app.api import auth, availability, onboarding, roster, users
 from app.auth_utils import hash_password
 from app.db.base import Base
 from app.db.session import engine
 import app.models
-from fastapi.middleware.cors import CORSMiddleware
-from datetime import date, timedelta
-import os
 
 Base.metadata.create_all(bind=engine)
+
 
 with engine.begin() as connection:
     inspector = inspect(connection)
     user_columns = {column["name"] for column in inspector.get_columns("user")}
     shift_columns = {column["name"] for column in inspector.get_columns("shift")}
+    availability_columns = {column["name"] for column in inspector.get_columns("availability")}
+    assignment_columns = {column["name"] for column in inspector.get_columns("shift_assignment")}
 
     if "min_hours" not in user_columns:
         connection.execute(
@@ -48,6 +53,87 @@ with engine.begin() as connection:
         connection.execute(
             text('ALTER TABLE "user" ADD COLUMN workplace_id INTEGER')
         )
+
+    default_workplace_row = connection.execute(
+        text('SELECT id FROM workplace ORDER BY id LIMIT 1')
+    ).fetchone()
+    default_workplace_id = default_workplace_row[0] if default_workplace_row else None
+
+    users_without_workplace = connection.execute(
+        text('SELECT COUNT(*) FROM "user" WHERE workplace_id IS NULL')
+    ).scalar_one()
+    if users_without_workplace > 0:
+        if default_workplace_id is None:
+            connection.execute(
+                text('INSERT INTO workplace (name) VALUES (:name)'),
+                {"name": "Default Workplace"},
+            )
+            default_workplace_id = connection.execute(
+                text('SELECT id FROM workplace ORDER BY id LIMIT 1')
+            ).scalar_one()
+        connection.execute(
+            text('UPDATE "user" SET workplace_id = :workplace_id WHERE workplace_id IS NULL'),
+            {"workplace_id": default_workplace_id},
+        )
+
+    remaining_user_nulls = connection.execute(
+        text('SELECT COUNT(*) FROM "user" WHERE workplace_id IS NULL')
+    ).scalar_one()
+    if remaining_user_nulls == 0:
+        connection.execute(
+            text('ALTER TABLE "user" ALTER COLUMN workplace_id SET NOT NULL')
+        )
+
+    if "workplace_id" not in availability_columns:
+        connection.execute(
+            text('ALTER TABLE "availability" ADD COLUMN workplace_id INTEGER')
+        )
+
+    connection.execute(
+        text(
+            'UPDATE "availability" a '
+            'SET workplace_id = u.workplace_id '
+            'FROM "user" u '
+            'WHERE a.user_id = u.id AND a.workplace_id IS NULL'
+        )
+    )
+    if default_workplace_id is not None:
+        connection.execute(
+            text('UPDATE "availability" SET workplace_id = :workplace_id WHERE workplace_id IS NULL'),
+            {"workplace_id": default_workplace_id},
+        )
+    remaining_availability_nulls = connection.execute(
+        text('SELECT COUNT(*) FROM "availability" WHERE workplace_id IS NULL')
+    ).scalar_one()
+    if remaining_availability_nulls == 0:
+        connection.execute(
+            text('ALTER TABLE "availability" ALTER COLUMN workplace_id SET NOT NULL')
+        )
+
+    if "workplace_id" not in shift_columns:
+        connection.execute(
+            text('ALTER TABLE "shift" ADD COLUMN workplace_id INTEGER')
+        )
+
+    connection.execute(
+        text(
+            'UPDATE "shift" s '
+            'SET workplace_id = source.workplace_id '
+            'FROM ('
+            '  SELECT sa.shift_id AS shift_id, MIN(u.workplace_id) AS workplace_id '
+            '  FROM shift_assignment sa '
+            '  JOIN "user" u ON sa.user_id = u.id '
+            '  GROUP BY sa.shift_id'
+            ') AS source '
+            'WHERE s.id = source.shift_id AND s.workplace_id IS NULL'
+        )
+    )
+    if default_workplace_id is not None:
+        connection.execute(
+            text('UPDATE "shift" SET workplace_id = :workplace_id WHERE workplace_id IS NULL'),
+            {"workplace_id": default_workplace_id},
+        )
+
     if "week_start_date" not in shift_columns:
         connection.execute(
             text('ALTER TABLE "shift" ADD COLUMN week_start_date DATE')
@@ -60,6 +146,49 @@ with engine.begin() as connection:
         connection.execute(
             text('ALTER TABLE "shift" ALTER COLUMN week_start_date SET NOT NULL')
         )
+
+    remaining_shift_nulls = connection.execute(
+        text('SELECT COUNT(*) FROM "shift" WHERE workplace_id IS NULL')
+    ).scalar_one()
+    if remaining_shift_nulls == 0:
+        connection.execute(
+            text('ALTER TABLE "shift" ALTER COLUMN workplace_id SET NOT NULL')
+        )
+
+    if "workplace_id" not in assignment_columns:
+        connection.execute(
+            text('ALTER TABLE "shift_assignment" ADD COLUMN workplace_id INTEGER')
+        )
+
+    connection.execute(
+        text(
+            'UPDATE "shift_assignment" sa '
+            'SET workplace_id = s.workplace_id '
+            'FROM "shift" s '
+            'WHERE sa.shift_id = s.id AND sa.workplace_id IS NULL'
+        )
+    )
+    connection.execute(
+        text(
+            'UPDATE "shift_assignment" sa '
+            'SET workplace_id = u.workplace_id '
+            'FROM "user" u '
+            'WHERE sa.user_id = u.id AND sa.workplace_id IS NULL'
+        )
+    )
+    if default_workplace_id is not None:
+        connection.execute(
+            text('UPDATE "shift_assignment" SET workplace_id = :workplace_id WHERE workplace_id IS NULL'),
+            {"workplace_id": default_workplace_id},
+        )
+    remaining_assignment_nulls = connection.execute(
+        text('SELECT COUNT(*) FROM "shift_assignment" WHERE workplace_id IS NULL')
+    ).scalar_one()
+    if remaining_assignment_nulls == 0:
+        connection.execute(
+            text('ALTER TABLE "shift_assignment" ALTER COLUMN workplace_id SET NOT NULL')
+        )
+
 
 app = FastAPI()
 
