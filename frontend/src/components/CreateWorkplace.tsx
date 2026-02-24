@@ -1,0 +1,102 @@
+import { useState } from "react";
+import API, { setAuthToken } from "../services/api";
+import "./Login.css";
+
+interface AuthUser {
+  id: number;
+  name: string;
+  role: "manager" | "staff";
+  is_active: boolean;
+}
+
+interface CreateWorkplaceProps {
+  onCreateSuccess: (user: AuthUser) => void;
+}
+
+interface CreateWorkplaceResponse {
+  access_token: string;
+  token_type: string;
+  user: AuthUser;
+}
+
+export default function CreateWorkplace({ onCreateSuccess }: CreateWorkplaceProps) {
+  const [workplaceName, setWorkplaceName] = useState("");
+  const [managerName, setManagerName] = useState("");
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setStatus("");
+
+    if (!workplaceName.trim() || !managerName.trim() || !password) {
+      setStatus("Enter workplace name, manager name, and password.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await API.post<CreateWorkplaceResponse>("/onboarding/create-workplace", {
+        workplace_name: workplaceName.trim(),
+        manager_name: managerName.trim(),
+        password,
+      });
+      setAuthToken(response.data.access_token);
+      onCreateSuccess(response.data.user);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setStatus(typeof detail === "string" ? detail : "Failed to create workplace.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <main className="login-page">
+      <form className="login-page__card" onSubmit={handleSubmit}>
+        <h1>Create Workplace</h1>
+        <p>Set up your first manager account.</p>
+
+        <label>
+          Workplace name
+          <input
+            type="text"
+            value={workplaceName}
+            onChange={event => setWorkplaceName(event.target.value)}
+            disabled={isSubmitting}
+            autoComplete="organization"
+          />
+        </label>
+
+        <label>
+          Manager name
+          <input
+            type="text"
+            value={managerName}
+            onChange={event => setManagerName(event.target.value)}
+            disabled={isSubmitting}
+            autoComplete="username"
+          />
+        </label>
+
+        <label>
+          Password
+          <input
+            type="password"
+            value={password}
+            onChange={event => setPassword(event.target.value)}
+            disabled={isSubmitting}
+            autoComplete="new-password"
+          />
+        </label>
+
+        {status && <p className="login-page__status">{status}</p>}
+
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Creating..." : "Create Workplace"}
+        </button>
+      </form>
+    </main>
+  );
+}
