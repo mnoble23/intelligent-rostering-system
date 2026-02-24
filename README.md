@@ -81,6 +81,17 @@ Frontend runs at: `http://localhost:3000`
 - Generate a roster from the UI
 - View roster 
 
+### Troubleshooting (Docker)
+- If you want a full clean reset of local Docker data:
+```bash
+docker compose down -v
+docker compose up --build
+```
+- If ports `3000`, `8000`, or `5432` are already in use, stop the conflicting local app/container and rerun:
+```bash
+docker compose up --build
+```
+
 ## Currently Implemented
 - FastAPI backend initialised
 - Modular backend folder structure
