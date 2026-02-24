@@ -59,6 +59,7 @@ Frontend runs at: `http://localhost:3000`
 
 ### 5. Use the app
 - Open `http://localhost:3000`
+- Create a new workplace or sign in if already created
 - Submit user availability
 - Generate a roster from the UI
 - View roster 
@@ -76,7 +77,9 @@ Frontend runs at: `http://localhost:3000`
 - Rosters can be generated for multiple weeks
 
 ## Next Steps
-- Role based access controls
+- Add docker support
+- Live demo with demo credentials
+- Implement full workspace scoping across all models/queries
 - Small improvements needed to make things like submitting availability less tedious
 - Subheadings for each page to separate things like roster generation and deletion from things like viewing 'My Profile' and 'My Roster' pages
 
@@ -100,13 +103,13 @@ Frontend runs at: `http://localhost:3000`
 - Generate Roster button
 - My Roster page to show a user their roster for the week
 - Shift coverage page to see what times are understaffed
-- Manager and staff roles to determine what access they have in the app (at this point, you can just pick staff or manager without authentication)
+- Login + JWT auth with role-based access (manager/staff)
+- First-run workplace onboarding flow for initial manager creation
 - My profile page added for a user to look at their info such as submitted availability and assigned shifts and min and max hours per week
 - React app has been updated with much nicer design and easier to navigate
 - Manual shift management page can be used to manage shifts by selecting the employee and day to edit it
 
 **Planned Improvements:**
-- Role based access control
 - Small improvements needed to make things like submitting availability less tedious
 - Subheadings for each page to separate things like roster generation and deletion from things like viewing 'My Profile' and 'My Roster' pages
 
