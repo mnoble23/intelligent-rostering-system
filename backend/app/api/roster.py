@@ -1,12 +1,16 @@
 from datetime import date, datetime, time, timedelta
+from typing import Dict, List, Set
+
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from typing import Dict, List, Set
-from pydantic import BaseModel, Field
 
-from app.db.session import get_db
 from app.api.auth import get_current_user, require_manager
+from app.db.session import get_db
+from app.models.shift_assignment_db import ShiftAssignmentDB
+from app.models.shift_db import ShiftDB
+from app.models.user_db import UserDB
 from app.services.availability_loader import load_weekly_availability
 from app.services.roster_generator import (
     BUSINESS_END,
@@ -16,9 +20,6 @@ from app.services.roster_generator import (
     generate_weekly_shifts,
     match_availability_to_shifts,
 )
-from app.models.shift_db import ShiftDB
-from app.models.shift_assignment_db import ShiftAssignmentDB
-from app.models.user_db import UserDB
 
 router = APIRouter(
     prefix="/roster",
@@ -55,14 +56,18 @@ def get_week_start(target_date: date) -> date:
     return target_date - timedelta(days=target_date.weekday())
 
 
-def get_latest_week_start(db: Session) -> date | None:
-    return db.query(func.max(ShiftDB.week_start_date)).scalar()
+def get_latest_week_start(db: Session, workplace_id: int) -> date | None:
+    return (
+        db.query(func.max(ShiftDB.week_start_date))
+        .filter(ShiftDB.workplace_id == workplace_id)
+        .scalar()
+    )
 
 
-def resolve_week_start(db: Session, requested_week_start: date | None) -> date | None:
+def resolve_week_start(db: Session, workplace_id: int, requested_week_start: date | None) -> date | None:
     if requested_week_start is not None:
         return get_week_start(requested_week_start)
-    latest = get_latest_week_start(db)
+    latest = get_latest_week_start(db, workplace_id)
     if latest is not None:
         return latest
     return None
@@ -71,19 +76,13 @@ def resolve_week_start(db: Session, requested_week_start: date | None) -> date |
 @router.get("/debug/availability")
 def debug_availability(
     db: Session = Depends(get_db),
-    _current_user: UserDB = Depends(require_manager),
+    current_user: UserDB = Depends(require_manager),
 ):
-    """
-    For debugging, will remove later.
-    """
-    return load_weekly_availability(db)
+    return load_weekly_availability(db, current_user.workplace_id)
 
 
 @router.get("/debug/shifts")
 def debug_shifts(_current_user: UserDB = Depends(require_manager)):
-    """
-    For debugging, will remove later.
-    """
     weekly = generate_weekly_shifts(get_week_start(date.today()))
     return {day: [f"{s.start_time}-{s.end_time}" for s in shifts] for day, shifts in weekly.items()}
 
@@ -91,12 +90,9 @@ def debug_shifts(_current_user: UserDB = Depends(require_manager)):
 @router.get("/debug/staffable-shifts")
 def debug_staffable_shifts(
     db: Session = Depends(get_db),
-    _current_user: UserDB = Depends(require_manager),
+    current_user: UserDB = Depends(require_manager),
 ):
-    """
-    For debugging, will remove later.
-    """
-    availability_map = load_weekly_availability(db)
+    availability_map = load_weekly_availability(db, current_user.workplace_id)
     weekly_shifts = generate_weekly_shifts(get_week_start(date.today()))
     staffable = match_availability_to_shifts(availability_map, weekly_shifts)
 
@@ -105,7 +101,7 @@ def debug_staffable_shifts(
             {
                 "start": s.start_time.strftime("%H:%M"),
                 "end": s.end_time.strftime("%H:%M"),
-                "staff": s.staff
+                "staff": s.staff,
             }
             for s in shifts
         ]
@@ -116,19 +112,16 @@ def debug_staffable_shifts(
 @router.get("/debug/assigned-shifts")
 def debug_assigned_shifts(
     db: Session = Depends(get_db),
-    _current_user: UserDB = Depends(require_manager),
+    current_user: UserDB = Depends(require_manager),
 ):
-    """
-    For debugging, will remove later.
-    """
-    availability_map = load_weekly_availability(db)
+    availability_map = load_weekly_availability(db, current_user.workplace_id)
 
     week_start = get_week_start(date.today())
     weekly_shifts = generate_weekly_shifts(week_start)
 
     staffable_shifts = match_availability_to_shifts(availability_map, weekly_shifts)
 
-    users = db.query(UserDB).all()
+    users = db.query(UserDB).filter_by(workplace_id=current_user.workplace_id).all()
     user_hour_limits = {
         user.id: (float(user.min_hours), float(user.max_hours))
         for user in users
@@ -141,6 +134,7 @@ def debug_assigned_shifts(
         db,
         staffable_shifts,
         week_start_date=week_start,
+        workplace_id=current_user.workplace_id,
         user_hour_limits=user_hour_limits,
         user_roles=user_roles,
     )
@@ -150,7 +144,7 @@ def debug_assigned_shifts(
             {
                 "start": s.start_time.strftime("%H:%M"),
                 "end": s.end_time.strftime("%H:%M"),
-                "staff": s.staff
+                "staff": s.staff,
             }
             for s in shifts
         ]
@@ -162,10 +156,10 @@ def debug_assigned_shifts(
 def generate_roster(
     payload: GenerateRosterRequest = GenerateRosterRequest(),
     db: Session = Depends(get_db),
-    _current_user: UserDB = Depends(require_manager),
+    current_user: UserDB = Depends(require_manager),
 ):
-    weekly_availability = load_weekly_availability(db)
-    users = db.query(UserDB).all()
+    weekly_availability = load_weekly_availability(db, current_user.workplace_id)
+    users = db.query(UserDB).filter_by(workplace_id=current_user.workplace_id).all()
     user_hour_limits = {
         user.id: (float(user.min_hours), float(user.max_hours))
         for user in users
@@ -188,6 +182,7 @@ def generate_roster(
                 db,
                 staffable_shifts,
                 week_start_date=week_start,
+                workplace_id=current_user.workplace_id,
                 user_hour_limits=user_hour_limits,
                 user_roles=user_roles,
             )
@@ -206,25 +201,35 @@ def generate_roster(
 def get_roster(
     week_start_date: date | None = None,
     db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
 ) -> List[Dict]:
-    resolved_week_start = resolve_week_start(db, week_start_date)
+    resolved_week_start = resolve_week_start(db, current_user.workplace_id, week_start_date)
     if resolved_week_start is None:
         return []
 
     shifts = (
         db.query(ShiftDB)
-        .filter_by(week_start_date=resolved_week_start)
+        .filter_by(
+            workplace_id=current_user.workplace_id,
+            week_start_date=resolved_week_start,
+        )
         .order_by(ShiftDB.day_of_week, ShiftDB.start_time)
         .all()
     )
     roster = []
 
     for shift in shifts:
-        assignments = db.query(ShiftAssignmentDB).filter_by(shift_id=shift.id).all()
+        assignments = db.query(ShiftAssignmentDB).filter_by(
+            workplace_id=current_user.workplace_id,
+            shift_id=shift.id,
+        ).all()
 
         staff = []
-        for a in assignments:
-            user = db.query(UserDB).get(a.user_id)
+        for assignment in assignments:
+            user = db.query(UserDB).filter_by(
+                id=assignment.user_id,
+                workplace_id=current_user.workplace_id,
+            ).first()
             if user:
                 staff.append({"id": user.id, "name": user.name})
 
@@ -234,7 +239,7 @@ def get_roster(
             "day_of_week": shift.day_of_week,
             "start_time": str(shift.start_time),
             "end_time": str(shift.end_time),
-            "staff": staff
+            "staff": staff,
         })
 
     return roster
@@ -243,9 +248,11 @@ def get_roster(
 @router.get("/weeks")
 def get_available_roster_weeks(
     db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
 ) -> List[str]:
     weeks = (
         db.query(ShiftDB.week_start_date)
+        .filter(ShiftDB.workplace_id == current_user.workplace_id)
         .distinct()
         .order_by(ShiftDB.week_start_date.desc())
         .all()
@@ -257,23 +264,32 @@ def get_available_roster_weeks(
 def delete_roster_week(
     week_start_date: date,
     db: Session = Depends(get_db),
-    _current_user: UserDB = Depends(require_manager),
+    current_user: UserDB = Depends(require_manager),
 ):
     resolved_week_start = get_week_start(week_start_date)
 
-    shifts = db.query(ShiftDB).filter_by(week_start_date=resolved_week_start).all()
+    shifts = db.query(ShiftDB).filter_by(
+        workplace_id=current_user.workplace_id,
+        week_start_date=resolved_week_start,
+    ).all()
     if not shifts:
         raise HTTPException(status_code=404, detail="Roster week not found")
 
     shift_ids = [shift.id for shift in shifts]
     deleted_assignments = (
         db.query(ShiftAssignmentDB)
-        .filter(ShiftAssignmentDB.shift_id.in_(shift_ids))
+        .filter(
+            ShiftAssignmentDB.workplace_id == current_user.workplace_id,
+            ShiftAssignmentDB.shift_id.in_(shift_ids),
+        )
         .delete(synchronize_session=False)
     )
     deleted_shifts = (
         db.query(ShiftDB)
-        .filter_by(week_start_date=resolved_week_start)
+        .filter_by(
+            workplace_id=current_user.workplace_id,
+            week_start_date=resolved_week_start,
+        )
         .delete(synchronize_session=False)
     )
     db.commit()
@@ -290,9 +306,9 @@ def delete_roster_week(
 def get_shift_coverage(
     week_start_date: date | None = None,
     db: Session = Depends(get_db),
-    _current_user: UserDB = Depends(require_manager),
+    current_user: UserDB = Depends(require_manager),
 ):
-    resolved_week_start = resolve_week_start(db, week_start_date)
+    resolved_week_start = resolve_week_start(db, current_user.workplace_id, week_start_date)
     if resolved_week_start is None:
         return {
             "week_start_date": None,
@@ -309,8 +325,11 @@ def get_shift_coverage(
             "coverage": [],
         }
 
-    shifts = db.query(ShiftDB).filter_by(week_start_date=resolved_week_start).all()
-    assignments = db.query(ShiftAssignmentDB).all()
+    shifts = db.query(ShiftDB).filter_by(
+        workplace_id=current_user.workplace_id,
+        week_start_date=resolved_week_start,
+    ).all()
+    assignments = db.query(ShiftAssignmentDB).filter_by(workplace_id=current_user.workplace_id).all()
 
     staff_by_shift: Dict[int, Set[int]] = {}
     for assignment in assignments:
@@ -377,24 +396,36 @@ def get_shift_coverage(
 def assign_user_to_shift(
     payload: ManualAssignmentUpdate,
     db: Session = Depends(get_db),
-    _current_user: UserDB = Depends(require_manager),
+    current_user: UserDB = Depends(require_manager),
 ):
-    shift = db.query(ShiftDB).filter_by(id=payload.shift_id).first()
+    shift = db.query(ShiftDB).filter_by(
+        id=payload.shift_id,
+        workplace_id=current_user.workplace_id,
+    ).first()
     if not shift:
         raise HTTPException(status_code=404, detail="Shift not found")
 
-    user = db.query(UserDB).filter_by(id=payload.user_id).first()
+    user = db.query(UserDB).filter_by(
+        id=payload.user_id,
+        workplace_id=current_user.workplace_id,
+        is_active=True,
+    ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     existing_assignment = db.query(ShiftAssignmentDB).filter_by(
         shift_id=payload.shift_id,
         user_id=payload.user_id,
+        workplace_id=current_user.workplace_id,
     ).first()
     if existing_assignment:
         raise HTTPException(status_code=400, detail="User already assigned to this shift")
 
-    assignment = ShiftAssignmentDB(shift_id=payload.shift_id, user_id=payload.user_id)
+    assignment = ShiftAssignmentDB(
+        shift_id=payload.shift_id,
+        user_id=payload.user_id,
+        workplace_id=current_user.workplace_id,
+    )
     db.add(assignment)
     db.commit()
 
@@ -405,12 +436,12 @@ def assign_user_to_shift(
 def upsert_shift(
     payload: ShiftUpsertRequest,
     db: Session = Depends(get_db),
-    _current_user: UserDB = Depends(require_manager),
+    current_user: UserDB = Depends(require_manager),
 ):
     if payload.day_of_week < 0 or payload.day_of_week > 6:
         raise HTTPException(status_code=400, detail="day_of_week must be between 0 and 6")
 
-    resolved_week_start = resolve_week_start(db, payload.week_start_date)
+    resolved_week_start = resolve_week_start(db, current_user.workplace_id, payload.week_start_date)
     if resolved_week_start is None:
         resolved_week_start = get_week_start(date.today())
 
@@ -421,6 +452,7 @@ def upsert_shift(
         raise HTTPException(status_code=400, detail="end_time must be later than start_time")
 
     existing_shift = db.query(ShiftDB).filter_by(
+        workplace_id=current_user.workplace_id,
         week_start_date=resolved_week_start,
         day_of_week=payload.day_of_week,
         start_time=start_time,
@@ -438,6 +470,7 @@ def upsert_shift(
         }
 
     new_shift = ShiftDB(
+        workplace_id=current_user.workplace_id,
         week_start_date=resolved_week_start,
         day_of_week=payload.day_of_week,
         start_time=start_time,
@@ -461,11 +494,12 @@ def upsert_shift(
 def unassign_user_from_shift(
     payload: ManualAssignmentUpdate,
     db: Session = Depends(get_db),
-    _current_user: UserDB = Depends(require_manager),
+    current_user: UserDB = Depends(require_manager),
 ):
     assignment = db.query(ShiftAssignmentDB).filter_by(
         shift_id=payload.shift_id,
         user_id=payload.user_id,
+        workplace_id=current_user.workplace_id,
     ).first()
 
     if not assignment:
