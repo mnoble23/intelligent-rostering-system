@@ -66,3 +66,12 @@
   cursor: wait;
   opacity: 0.8;
 }
+
+.auth-choice__actions {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-choice__hint {
+  font-size: 0.9rem;
+}
