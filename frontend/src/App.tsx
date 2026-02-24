@@ -13,6 +13,8 @@ import MyRoster from "./components/MyRoster";
 import ShiftCoverage from "./components/ShiftCoverage";
 import MyProfile from "./components/MyProfile";
 import Login from "./components/Login";
+import CreateWorkplace from "./components/CreateWorkplace";
+import AuthChoice from "./components/AuthChoice";
 
 interface DashboardPageProps {
   shifts: any[];
@@ -20,12 +22,17 @@ interface DashboardPageProps {
 }
 
 type AppRole = "manager" | "staff";
+type AuthView = "chooser" | "login" | "create";
 
 interface AuthUser {
   id: number;
   name: string;
   role: AppRole;
   is_active: boolean;
+}
+
+interface OnboardingStatusResponse {
+  is_bootstrapped: boolean;
 }
 
 function formatWeekOption(weekStartDate: string) {
@@ -62,6 +69,8 @@ function RoleGate({ role, allowedRoles, children }: RoleGateProps) {
 export default function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [isBootstrapped, setIsBootstrapped] = useState(false);
+  const [authView, setAuthView] = useState<AuthView>("chooser");
   const [authzMessage, setAuthzMessage] = useState("");
   const [shifts, setShifts] = useState<any[]>([]);
   const [availableWeeks, setAvailableWeeks] = useState<string[]>([]);
@@ -72,6 +81,7 @@ export default function App() {
   const clearAuth = useCallback(() => {
     setAuthToken(null);
     setAuthUser(null);
+    setAuthView("chooser");
     setAuthzMessage("");
     setShifts([]);
     setAvailableWeeks([]);
@@ -115,8 +125,32 @@ export default function App() {
   }, [authUser, clearAuth]);
 
   useEffect(() => {
-    clearAuth();
-    setAuthReady(true);
+    let cancelled = false;
+
+    async function initializeApp() {
+      clearAuth();
+      try {
+        const response = await API.get<OnboardingStatusResponse>("/onboarding/status");
+        if (!cancelled) {
+          setIsBootstrapped(response.data.is_bootstrapped);
+        }
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) {
+          setIsBootstrapped(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setAuthReady(true);
+        }
+      }
+    }
+
+    initializeApp();
+
+    return () => {
+      cancelled = true;
+    };
   }, [clearAuth]);
 
   useEffect(() => {
@@ -137,10 +171,30 @@ export default function App() {
     );
   }
 
-  if (!role) return <Login onLoginSuccess={user => {
-    setAuthUser(user);
-    setAuthzMessage("");
-  }} />;
+  if (!role) {
+    if (authView === "login") {
+      return <Login onLoginSuccess={user => {
+        setAuthUser(user);
+        setAuthzMessage("");
+      }} />;
+    }
+
+    if (authView === "create") {
+      return <CreateWorkplace onCreateSuccess={user => {
+        setAuthUser(user);
+        setIsBootstrapped(true);
+        setAuthzMessage("");
+      }} />;
+    }
+
+    return (
+      <AuthChoice
+        isBootstrapped={isBootstrapped}
+        onSelectLogin={() => setAuthView("login")}
+        onSelectCreate={() => setAuthView("create")}
+      />
+    );
+  }
 
   const navItems =
     role === "manager"
