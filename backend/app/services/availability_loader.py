@@ -8,10 +8,10 @@ TimeRange = Tuple[time, time]
 WeeklyAvailability = Dict[int, Dict[int, List[TimeRange]]]
 
 
-def load_weekly_availability(db: Session) -> WeeklyAvailability:
+def load_weekly_availability(db: Session, workplace_id: int) -> WeeklyAvailability:
     weekly_availability: WeeklyAvailability = {day: {} for day in range(7)}
 
-    availabilities = db.query(AvailabilityDB).all()
+    availabilities = db.query(AvailabilityDB).filter_by(workplace_id=workplace_id).all()
 
     for availability in availabilities:
         day = availability.day_of_week

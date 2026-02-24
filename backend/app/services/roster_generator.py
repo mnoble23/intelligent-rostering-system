@@ -1,9 +1,11 @@
 from dataclasses import dataclass, field
 from datetime import date, time
 from typing import Dict, List, Tuple
-from app.models.shift_db import ShiftDB
-from app.models.shift_assignment_db import ShiftAssignmentDB
+
 from sqlalchemy.orm import Session
+
+from app.models.shift_assignment_db import ShiftAssignmentDB
+from app.models.shift_db import ShiftDB
 
 WeeklyAvailability = Dict[int, Dict[int, List[Tuple[time, time]]]]
 UserHourLimits = Dict[int, Tuple[float, float]]
@@ -16,6 +18,7 @@ MIN_STAFF_PER_SHIFT = 2
 MIN_MANAGERS_PER_HOUR = 1
 MANAGER_ROLE = "manager"
 
+
 @dataclass
 class Shift:
     week_start_date: date
@@ -23,6 +26,7 @@ class Shift:
     start_time: time
     end_time: time
     staff: List[int] = field(default_factory=list)
+
 
 def generate_weekly_shifts(week_start_date: date) -> Dict[int, List[Shift]]:
     weekly_shifts: Dict[int, List[Shift]] = {}
@@ -42,6 +46,7 @@ def generate_weekly_shifts(week_start_date: date) -> Dict[int, List[Shift]]:
                 shifts.append(shift)
         weekly_shifts[day] = shifts
     return weekly_shifts
+
 
 def match_availability_to_shifts(
     weekly_availability: WeeklyAvailability,
@@ -68,10 +73,12 @@ def match_availability_to_shifts(
 
     return staffable_shifts
 
+
 def assign_staff_to_shifts(
     db: Session,
     staffable_shifts: Dict[int, List[Shift]],
     week_start_date: date,
+    workplace_id: int,
     min_staff_per_shift: int = MIN_STAFF_PER_SHIFT,
     user_hour_limits: UserHourLimits | None = None,
     user_roles: UserRoles | None = None,
@@ -160,10 +167,8 @@ def assign_staff_to_shifts(
             if is_manager(user_id):
                 hourly_assigned_managers_by_day[day][hour] += 1
 
-    # Phase 0: guarantee manager coverage across business hours.
     while True:
         best_manager_assignment: Tuple[int, int, float, int] | None = None
-        # (shift_id, user_id, duration_hours, manager_coverage_gain)
 
         for day, ordered_shifts in ordered_shifts_by_day.items():
             hourly_assigned_managers = hourly_assigned_managers_by_day[day]
@@ -231,10 +236,8 @@ def assign_staff_to_shifts(
         shift_id, user_id, _, _ = best_manager_assignment
         apply_assignment(user_id, shift_id)
 
-    # Phase 1: prioritize minimum coverage across business hours.
     while True:
         best_assignment: Tuple[int, int, float, int] | None = None
-        # (shift_id, user_id, duration_hours, coverage_gain)
 
         for day, ordered_shifts in ordered_shifts_by_day.items():
             hourly_assigned_staff = hourly_assigned_staff_by_day[day]
@@ -292,7 +295,6 @@ def assign_staff_to_shifts(
         shift_id, user_id, _, _ = best_assignment
         apply_assignment(user_id, shift_id)
 
-    # Phase 2: top up users who are still below minimum weekly hours.
     while True:
         users_below_min = [
             user_id
@@ -363,13 +365,19 @@ def assign_staff_to_shifts(
 
     existing_shift_ids = [
         shift_id
-        for (shift_id,) in db.query(ShiftDB.id).filter_by(week_start_date=week_start_date).all()
+        for (shift_id,) in db.query(ShiftDB.id)
+        .filter_by(week_start_date=week_start_date, workplace_id=workplace_id)
+        .all()
     ]
     if existing_shift_ids:
         db.query(ShiftAssignmentDB).filter(
-            ShiftAssignmentDB.shift_id.in_(existing_shift_ids)
+            ShiftAssignmentDB.shift_id.in_(existing_shift_ids),
+            ShiftAssignmentDB.workplace_id == workplace_id,
         ).delete(synchronize_session=False)
-    db.query(ShiftDB).filter_by(week_start_date=week_start_date).delete(synchronize_session=False)
+    db.query(ShiftDB).filter_by(
+        week_start_date=week_start_date,
+        workplace_id=workplace_id,
+    ).delete(synchronize_session=False)
     db.commit()
 
     for day, ordered_shifts in ordered_shifts_by_day.items():
@@ -384,6 +392,7 @@ def assign_staff_to_shifts(
             db_shift = (
                 db.query(ShiftDB)
                 .filter_by(
+                    workplace_id=workplace_id,
                     week_start_date=week_start_date,
                     day_of_week=shift.day_of_week,
                     start_time=shift.start_time,
@@ -393,6 +402,7 @@ def assign_staff_to_shifts(
             )
             if not db_shift:
                 db_shift = ShiftDB(
+                    workplace_id=workplace_id,
                     week_start_date=week_start_date,
                     day_of_week=shift.day_of_week,
                     start_time=shift.start_time,
@@ -405,12 +415,14 @@ def assign_staff_to_shifts(
             for uid in shift.staff:
                 exists = (
                     db.query(ShiftAssignmentDB)
-                    .filter_by(shift_id=db_shift.id, user_id=uid)
+                    .filter_by(shift_id=db_shift.id, user_id=uid, workplace_id=workplace_id)
                     .first()
                 )
                 if not exists:
                     db_assignment = ShiftAssignmentDB(
-                        shift_id=db_shift.id, user_id=uid
+                        shift_id=db_shift.id,
+                        user_id=uid,
+                        workplace_id=workplace_id,
                     )
                     db.add(db_assignment)
             db.commit()
