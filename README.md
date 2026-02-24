@@ -5,8 +5,8 @@ Full-stack web application for generating optimised staff rosters based on avail
 - **Backend:** Python, FastAPI 
 - **Frontend:** React
 - **Database:** PostgreSQL 
-- **Authentication:** JWT (planned)
-- **Deployment:** Docker (planned)
+- **Authentication:** JWT 
+- **Deployment:** Docker (local docker-compose setup available)
 
 ## Project Overview
 This system will allow staff to submit their availability and will generate rosters based on these availabilities and some other constraints to optimise the rosters.
@@ -22,32 +22,49 @@ Work in progress.
 
 ## How To Run
 
+Choose one of the two options below.
+
 ### 1. Clone Repo
 ```bash
 git clone https://github.com/mnoble23/intelligent-rostering-syst
 cd intelligent-rostering-system
 ```
 
-### 2. Configure Backend with Database
+### Option A: Run with Docker (recommended)
+```bash
+docker compose up --build
+```
+
+Frontend runs at: `http://localhost:3000`  
+Backend runs at: `http://127.0.0.1:8000`
+
+To reset local docker data:
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+### Option B: Run manually (without Docker)
+
+#### 1. Configure Backend with Database
 Create a `.env` file inside `backend/` and add your database connection string:
 
 ```env
 DATABASE_URL=postgresql+psycopg2://<username>:<password>@<host>:<port>/<database_name>
 ```
 
-### 3. Backend Setup (FastAPI)
+#### 2. Backend Setup (FastAPI)
 ```bash
 cd backend
 python -m venv .venv
 source .venv/Scripts/activate 
 pip install -r requirements.txt
-pip install python-dotenv
 uvicorn app.main:app --reload
 ```
 
 Backend runs at: `http://127.0.0.1:8000`
 
-### 4. Start the Frontend (React)
+#### 3. Start the Frontend (React)
 In a second terminal:
 ```bash
 cd frontend
@@ -57,7 +74,7 @@ npm start
 
 Frontend runs at: `http://localhost:3000`
 
-### 5. Use the app
+### Use the app
 - Open `http://localhost:3000`
 - Create a new workplace or sign in if already created
 - Submit user availability
@@ -77,9 +94,9 @@ Frontend runs at: `http://localhost:3000`
 - Rosters can be generated for multiple weeks
 
 ## Next Steps
-- Add docker support
 - Live demo with demo credentials
-- Implement full workspace scoping across all models/queries
+- Add DB-level uniqueness/index constraints for tenant safety and performance
+- Add more cross-workplace regression tests around manager edge cases
 - Small improvements needed to make things like submitting availability less tedious
 - Subheadings for each page to separate things like roster generation and deletion from things like viewing 'My Profile' and 'My Roster' pages
 
@@ -128,4 +145,3 @@ Frontend runs at: `http://localhost:3000`
 
 ## License
 This project is licensed under the MIT License.
-
