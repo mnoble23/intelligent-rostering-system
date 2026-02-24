@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Float, Integer, String
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String
 from app.db.base import Base
 
 class UserDB(Base):
@@ -11,3 +11,4 @@ class UserDB(Base):
     max_hours = Column(Float, nullable=False, default=40.0)
     password_hash = Column(String, nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
+    workplace_id = Column(Integer, ForeignKey("workplace.id"), nullable=True)

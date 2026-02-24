@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from sqlalchemy import inspect, text
-from app.api import users, availability, roster, auth
+from app.api import users, availability, roster, auth, onboarding
 from app.auth_utils import hash_password
 from app.db.base import Base
 from app.db.session import engine
@@ -44,6 +44,10 @@ with engine.begin() as connection:
         connection.execute(
             text('ALTER TABLE "user" ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE')
         )
+    if "workplace_id" not in user_columns:
+        connection.execute(
+            text('ALTER TABLE "user" ADD COLUMN workplace_id INTEGER')
+        )
     if "week_start_date" not in shift_columns:
         connection.execute(
             text('ALTER TABLE "shift" ADD COLUMN week_start_date DATE')
@@ -67,10 +71,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(onboarding.router)
 app.include_router(users.router)
 app.include_router(availability.router)
 app.include_router(roster.router)
 app.include_router(auth.router)
+
 
 @app.get("/")
 def root():
