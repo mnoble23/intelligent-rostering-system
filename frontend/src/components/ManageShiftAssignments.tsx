@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import API from "../services/api";
 import RosterTable, { type EmployeeRow, type ShiftAssignment } from "./RosterTable";
 import "./ManageShiftAssignments.css";
@@ -50,7 +50,7 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
   const [status, setStatus] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [usersRes, shiftsRes] = await Promise.all([
         API.get("/users"),
@@ -62,11 +62,11 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
       console.error(err);
       setStatus("Failed to load users and shifts.");
     }
-  };
+  }, [weekStartDate]);
 
   useEffect(() => {
     loadData();
-  }, [weekStartDate]);
+  }, [loadData]);
 
   const sortedShifts = useMemo(
     () =>

@@ -14,6 +14,21 @@ import app.models
 Base.metadata.create_all(bind=engine)
 
 
+def get_cors_origins() -> list[str]:
+    # Comma-separated list, e.g. "https://demo.example.com,https://staging.example.com"
+    raw = os.getenv("CORS_ALLOW_ORIGINS", "").strip()
+    if not raw:
+        return [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ]
+    origins = [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
+    return origins or [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+
 with engine.begin() as connection:
     inspector = inspect(connection)
     user_columns = {column["name"] for column in inspector.get_columns("user")}
@@ -191,10 +206,11 @@ with engine.begin() as connection:
 
 
 app = FastAPI()
+cors_origins = get_cors_origins()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
