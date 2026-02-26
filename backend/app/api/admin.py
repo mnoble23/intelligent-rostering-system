@@ -91,6 +91,16 @@ def _reset_and_seed_demo(db: Session) -> dict:
         max_hours=60.0,
     )
 
+    manager_third = _create_demo_user(
+        db=db,
+        workplace_id=workplace.id,
+        name="demo_manager_3",
+        role="manager",
+        password=manager_password,
+        min_hours=20.0,
+        max_hours=60.0,
+    )
+
     staff_users = [
         _create_demo_user(
             db=db,
@@ -101,10 +111,10 @@ def _reset_and_seed_demo(db: Session) -> dict:
             min_hours=10.0,
             max_hours=40.0,
         )
-        for index in range(1, 10)
+        for index in range(1, 16)
     ]
 
-    all_user_ids = [manager_primary.id, manager_secondary.id, *[user.id for user in staff_users]]
+    all_user_ids = [manager_primary.id, manager_secondary.id, manager_third.id, *[user.id for user in staff_users]]
     _seed_full_week_availability(db, workplace.id, all_user_ids)
     db.commit()
 
