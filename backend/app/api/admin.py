@@ -69,8 +69,8 @@ def _seed_full_week_availability(db: Session, workplace_id: int, user_ids: list[
 
 def _reset_and_seed_demo(db: Session) -> dict:
     demo_workplace_name = os.getenv("DEMO_WORKPLACE_NAME", "Demo Company")
-    manager_password = os.getenv("DEMO_MANAGER_PASSWORD", "DemoManager123!")
-    staff_password = os.getenv("DEMO_STAFF_PASSWORD", "DemoStaff123!")
+    manager_password = os.getenv("DEMO_MANAGER_PASSWORD", "Manager123!")
+    staff_password = os.getenv("DEMO_STAFF_PASSWORD", "Staff123!")
 
     db.query(ShiftAssignmentDB).delete(synchronize_session=False)
     db.query(ShiftDB).delete(synchronize_session=False)
@@ -112,7 +112,7 @@ def _reset_and_seed_demo(db: Session) -> dict:
             min_hours=10.0,
             max_hours=40.0,
         )
-        for index in range(1, 5)
+        for index in range(1, 10)
     ]
 
     all_user_ids = [manager_primary.id, manager_secondary.id, *[user.id for user in staff_users]]
