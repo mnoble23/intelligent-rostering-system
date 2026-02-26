@@ -20,6 +20,26 @@ Key features include:
 ## Project Status
 Work in progress.
 
+## Live Demo
+- Frontend URL: `https://intelligent-rostering-system.vercel.app/`
+- Backend URL: `https://intelligent-rostering-system.onrender.com`
+
+### Demo Credentials
+- Manager: `demo_manager` / `DemoManager123!`
+- Staff: `demo_staff_1` / `DemoStaff123!`
+
+### Demo Notes
+- Frontend may take a while to load initially due to using free tier hosting services but a refresh after 30-60 seconds should work.
+- Demo data resets nightly at 05:00 Irish Time.
+- If demo credentials stop working, wait for the next scheduled reset or trigger `/admin/reset-demo` manually.
+
+### Quick Test Flow
+1. Sign in as `demo_manager`
+2. Open **Roster Dashboard**
+3. Go to **Generate Roster** and generate for the selected week
+4. Open **Manage Shifts** and make one assignment change
+5. Sign out and verify staff view with `demo_staff_1`
+
 ## How To Run
 
 Choose one of the two options below.
@@ -105,7 +125,6 @@ docker compose up --build
 - Rosters can be generated for multiple weeks
 
 ## Next Steps
-- Live demo with demo credentials
 - Add DB-level uniqueness/index constraints for tenant safety and performance
 - Add more cross-workplace regression tests around manager edge cases
 - Small improvements needed to make things like submitting availability less tedious
