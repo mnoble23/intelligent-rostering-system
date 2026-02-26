@@ -1,6 +1,6 @@
 import os
 import secrets
-from datetime import date, time, timedelta
+from datetime import time
 
 from fastapi import APIRouter, Header, HTTPException, status
 from sqlalchemy.orm import Session
@@ -12,22 +12,11 @@ from app.models.shift_assignment_db import ShiftAssignmentDB
 from app.models.shift_db import ShiftDB
 from app.models.user_db import UserDB
 from app.models.workplace_db import WorkplaceDB
-from app.services.availability_loader import load_weekly_availability
-from app.services.roster_generator import (
-    assign_staff_to_shifts,
-    generate_weekly_shifts,
-    match_availability_to_shifts,
-)
 
 router = APIRouter(
     prefix="/admin",
     tags=["Admin"],
 )
-
-
-def _week_start_for_today() -> date:
-    today = date.today()
-    return today - timedelta(days=today.weekday())
 
 
 def _create_demo_user(
@@ -119,26 +108,10 @@ def _reset_and_seed_demo(db: Session) -> dict:
     _seed_full_week_availability(db, workplace.id, all_user_ids)
     db.commit()
 
-    users = db.query(UserDB).filter_by(workplace_id=workplace.id).all()
-    weekly_availability = load_weekly_availability(db, workplace.id)
-    user_hour_limits = {user.id: (float(user.min_hours), float(user.max_hours)) for user in users}
-    user_roles = {user.id: user.role for user in users}
-    week_start = _week_start_for_today()
-    weekly_shifts = generate_weekly_shifts(week_start)
-    staffable = match_availability_to_shifts(weekly_availability, weekly_shifts)
-    assign_staff_to_shifts(
-        db=db,
-        staffable_shifts=staffable,
-        week_start_date=week_start,
-        workplace_id=workplace.id,
-        user_hour_limits=user_hour_limits,
-        user_roles=user_roles,
-    )
-
     return {
         "status": "demo reset complete",
         "workplace": demo_workplace_name,
-        "week_start_date": week_start.isoformat(),
+        "roster_generated": False,
         "manager_usernames": ["demo_manager", "demo_manager_2"],
         "staff_usernames": [user.name for user in staff_users],
     }
@@ -169,9 +142,6 @@ def reset_demo(x_reset_key: str | None = Header(default=None, alias="X-Reset-Key
     db = SessionLocal()
     try:
         return _reset_and_seed_demo(db)
-    except ValueError as exc:
-        db.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except Exception:
         db.rollback()
         raise
