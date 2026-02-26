@@ -35,6 +35,13 @@ interface OnboardingStatusResponse {
   is_bootstrapped: boolean;
 }
 
+function normalizeHost(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return "";
+  const withoutProtocol = trimmed.replace(/^https?:\/\//, "");
+  return withoutProtocol.split("/")[0].split(":")[0];
+}
+
 function formatWeekOption(weekStartDate: string) {
   const [year, month, day] = weekStartDate.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -75,10 +82,14 @@ export default function App() {
   const [shifts, setShifts] = useState<any[]>([]);
   const [availableWeeks, setAvailableWeeks] = useState<string[]>([]);
   const [selectedWeek, setSelectedWeek] = useState<string>("");
-  const demoHostname = (process.env.REACT_APP_DEMO_HOSTNAME || "").trim().toLowerCase();
+  const demoHostname = normalizeHost(process.env.REACT_APP_DEMO_HOSTNAME || "");
+  const currentHost = window.location.hostname.toLowerCase();
+  const demoHostMatch =
+    Boolean(demoHostname) &&
+    (currentHost === demoHostname || currentHost.endsWith(`.${demoHostname}`));
   const showDemoUi =
     process.env.REACT_APP_SHOW_DEMO_UI === "true" ||
-    (Boolean(demoHostname) && window.location.hostname.toLowerCase() === demoHostname);
+    demoHostMatch;
 
   const role = authUser?.role ?? null;
 
