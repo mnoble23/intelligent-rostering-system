@@ -62,20 +62,10 @@ def _seed_realistic_demo_availability(db: Session, workplace_id: int, users: lis
     users_by_name = {user.name: user for user in users}
 
     schedule_by_name: dict[str, list[tuple[int, str, str]]] = {
-        # Managers: guarantee full 06:00-22:00 manager coverage every day.
-        "demo_manager": [
-            (0, "06:00", "14:00"), (1, "06:00", "14:00"), (2, "06:00", "14:00"),
-            (3, "06:00", "14:00"), (4, "06:00", "14:00"), (5, "07:00", "13:00"),
-        ],
-        "demo_manager_2": [
-            (0, "10:00", "18:00"), (1, "10:00", "18:00"), (2, "10:00", "18:00"),
-            (3, "10:00", "18:00"), (4, "10:00", "18:00"), (6, "09:00", "17:00"),
-        ],
-        "demo_manager_3": [
-            (0, "14:00", "22:00"), (1, "14:00", "22:00"), (2, "14:00", "22:00"),
-            (3, "14:00", "22:00"), (4, "14:00", "22:00"), (5, "06:00", "22:00"),
-            (6, "06:00", "22:00"),
-        ],
+        # Managers: fully available all week for robust manager coverage.
+        "demo_manager": [(day, "06:00", "22:00") for day in range(7)],
+        "demo_manager_2": [(day, "06:00", "22:00") for day in range(7)],
+        "demo_manager_3": [(day, "06:00", "22:00") for day in range(7)],
         # Staff: realistic mixed patterns (early/mid/late + weekdays/weekends + part-time).
         "demo_staff_1": [
             (0, "06:00", "14:00"), (1, "06:00", "14:00"), (2, "06:00", "14:00"),
