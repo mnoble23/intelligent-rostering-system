@@ -75,6 +75,10 @@ export default function App() {
   const [shifts, setShifts] = useState<any[]>([]);
   const [availableWeeks, setAvailableWeeks] = useState<string[]>([]);
   const [selectedWeek, setSelectedWeek] = useState<string>("");
+  const demoHostname = (process.env.REACT_APP_DEMO_HOSTNAME || "").trim().toLowerCase();
+  const showDemoUi =
+    process.env.REACT_APP_SHOW_DEMO_UI === "true" ||
+    (Boolean(demoHostname) && window.location.hostname.toLowerCase() === demoHostname);
 
   const role = authUser?.role ?? null;
 
@@ -192,6 +196,7 @@ export default function App() {
         isBootstrapped={isBootstrapped}
         onSelectLogin={() => setAuthView("login")}
         onSelectCreate={() => setAuthView("create")}
+        showDemoCredentials={showDemoUi}
       />
     );
   }
@@ -262,9 +267,11 @@ export default function App() {
         </aside>
 
         <main className="app-content">
-          <p className="app-content__demo-banner">
-            Demo Environment: Data resets nightly at 05:00 (Ireland Time).
-          </p>
+          {showDemoUi && (
+            <p className="app-content__demo-banner">
+              Demo environment: data resets nightly at midnight (US Eastern).
+            </p>
+          )}
           {authzMessage && <p className="app-content__notice">{authzMessage}</p>}
           <Routes>
             <Route
