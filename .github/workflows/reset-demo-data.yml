@@ -1,0 +1,27 @@
+name: Reset Demo Data
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 05:00 UTC is midnight US Eastern Standard Time.
+    - cron: "0 5 * * *"
+
+jobs:
+  reset-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call demo reset endpoint
+        env:
+          DEMO_RESET_URL: ${{ secrets.DEMO_RESET_URL }}
+          DEMO_RESET_KEY: ${{ secrets.DEMO_RESET_KEY }}
+        run: |
+          if [ -z "$DEMO_RESET_URL" ] || [ -z "$DEMO_RESET_KEY" ]; then
+            echo "Missing DEMO_RESET_URL or DEMO_RESET_KEY repository secret."
+            exit 1
+          fi
+
+          curl --fail --show-error --silent \
+            -X POST "$DEMO_RESET_URL" \
+            -H "X-Reset-Key: $DEMO_RESET_KEY" \
+            -H "Content-Type: application/json"
+
