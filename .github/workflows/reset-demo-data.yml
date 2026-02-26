@@ -3,7 +3,6 @@ name: Reset Demo Data
 on:
   workflow_dispatch:
   schedule:
-    # 05:00 UTC is midnight US Eastern Standard Time.
     - cron: "0 5 * * *"
 
 jobs:

@@ -280,7 +280,7 @@ export default function App() {
         <main className="app-content">
           {showDemoUi && (
             <p className="app-content__demo-banner">
-              Demo environment: data resets nightly at midnight (US Eastern).
+              Demo Environment: Data resets nightly at 5am Irish Time.
             </p>
           )}
           {authzMessage && <p className="app-content__notice">{authzMessage}</p>}

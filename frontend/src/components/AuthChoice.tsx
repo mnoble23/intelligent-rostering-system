@@ -27,8 +27,8 @@ export default function AuthChoice({
         {showDemoCredentials && (
           <section className="auth-choice__demo" aria-label="Demo credentials">
             <h2>Demo Credentials</h2>
-            <p>Manager: <strong>demo_manager</strong> / <strong>DemoManager123!</strong></p>
-            <p>Staff: <strong>demo_staff_1</strong> / <strong>DemoStaff123!</strong></p>
+            <p>Manager: <strong>demo_manager</strong> / <strong>Manager123!</strong></p>
+            <p>Staff: <strong>demo_staff_1</strong> / <strong>Staff123!</strong></p>
           </section>
         )}
 

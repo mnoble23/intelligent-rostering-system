@@ -25,8 +25,8 @@ Work in progress.
 - Backend URL: `https://intelligent-rostering-system.onrender.com`
 
 ### Demo Credentials
-- Manager: `demo_manager` / `DemoManager123!`
-- Staff: `demo_staff_1` / `DemoStaff123!`
+- Manager: `demo_manager` / `Manager123!`
+- Staff: `demo_staff_1` / `Staff123!`
 
 ### Demo Notes
 - Frontend may take a while to load initially due to using free tier hosting services but a refresh after 30-60 seconds should work.

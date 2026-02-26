@@ -42,18 +42,104 @@ def _create_demo_user(
     return user
 
 
-def _seed_full_week_availability(db: Session, workplace_id: int, user_ids: list[int]) -> None:
-    for user_id in user_ids:
-        for day_of_week in range(7):
+def _seed_realistic_demo_availability(db: Session, workplace_id: int, users: list[UserDB]) -> None:
+    def hm(value: str) -> time:
+        hour, minute = value.split(":")
+        return time(hour=int(hour), minute=int(minute))
+
+    def add_windows(user_id: int, windows: list[tuple[int, str, str]]) -> None:
+        for day_of_week, start, end in windows:
             db.add(
                 AvailabilityDB(
                     workplace_id=workplace_id,
                     user_id=user_id,
                     day_of_week=day_of_week,
-                    start_time=time(hour=6),
-                    end_time=time(hour=22),
+                    start_time=hm(start),
+                    end_time=hm(end),
                 )
             )
+
+    users_by_name = {user.name: user for user in users}
+
+    schedule_by_name: dict[str, list[tuple[int, str, str]]] = {
+        # Managers: guarantee full 06:00-22:00 manager coverage every day.
+        "demo_manager": [
+            (0, "06:00", "14:00"), (1, "06:00", "14:00"), (2, "06:00", "14:00"),
+            (3, "06:00", "14:00"), (4, "06:00", "14:00"), (5, "07:00", "13:00"),
+        ],
+        "demo_manager_2": [
+            (0, "10:00", "18:00"), (1, "10:00", "18:00"), (2, "10:00", "18:00"),
+            (3, "10:00", "18:00"), (4, "10:00", "18:00"), (6, "09:00", "17:00"),
+        ],
+        "demo_manager_3": [
+            (0, "14:00", "22:00"), (1, "14:00", "22:00"), (2, "14:00", "22:00"),
+            (3, "14:00", "22:00"), (4, "14:00", "22:00"), (5, "06:00", "22:00"),
+            (6, "06:00", "22:00"),
+        ],
+        # Staff: realistic mixed patterns (early/mid/late + weekdays/weekends + part-time).
+        "demo_staff_1": [
+            (0, "06:00", "14:00"), (1, "06:00", "14:00"), (2, "06:00", "14:00"),
+            (3, "06:00", "14:00"), (4, "06:00", "14:00"),
+        ],
+        "demo_staff_2": [
+            (0, "07:00", "15:00"), (1, "07:00", "15:00"), (2, "07:00", "15:00"),
+            (3, "07:00", "15:00"), (4, "07:00", "15:00"),
+        ],
+        "demo_staff_3": [
+            (1, "08:00", "16:00"), (2, "08:00", "16:00"), (3, "08:00", "16:00"),
+            (4, "08:00", "16:00"), (5, "08:00", "16:00"),
+        ],
+        "demo_staff_4": [
+            (1, "10:00", "18:00"), (2, "10:00", "18:00"), (3, "10:00", "18:00"),
+            (4, "10:00", "18:00"), (5, "10:00", "18:00"),
+        ],
+        "demo_staff_5": [
+            (2, "12:00", "20:00"), (3, "12:00", "20:00"), (4, "12:00", "20:00"),
+            (5, "12:00", "20:00"), (6, "12:00", "20:00"),
+        ],
+        "demo_staff_6": [
+            (0, "14:00", "22:00"), (1, "14:00", "22:00"), (2, "14:00", "22:00"),
+            (3, "14:00", "22:00"), (4, "14:00", "22:00"),
+        ],
+        "demo_staff_7": [
+            (1, "13:00", "21:00"), (2, "13:00", "21:00"), (3, "13:00", "21:00"),
+            (4, "13:00", "21:00"), (5, "13:00", "21:00"),
+        ],
+        "demo_staff_8": [
+            (0, "16:00", "22:00"), (5, "06:00", "14:00"), (6, "06:00", "14:00"),
+        ],
+        "demo_staff_9": [
+            (4, "12:00", "20:00"), (5, "14:00", "22:00"), (6, "14:00", "22:00"),
+        ],
+        "demo_staff_10": [
+            (0, "09:00", "17:00"), (2, "09:00", "17:00"), (4, "09:00", "17:00"),
+        ],
+        "demo_staff_11": [
+            (1, "09:00", "17:00"), (3, "09:00", "17:00"), (5, "09:00", "17:00"),
+        ],
+        "demo_staff_12": [
+            (0, "11:00", "19:00"), (1, "11:00", "19:00"), (2, "11:00", "19:00"),
+            (3, "11:00", "19:00"), (4, "11:00", "19:00"), (5, "11:00", "19:00"),
+            (6, "11:00", "19:00"),
+        ],
+        "demo_staff_13": [
+            (0, "15:00", "22:00"), (1, "15:00", "22:00"),
+            (3, "15:00", "22:00"), (4, "15:00", "22:00"),
+        ],
+        "demo_staff_14": [
+            (2, "06:00", "12:00"), (3, "06:00", "12:00"), (4, "06:00", "12:00"),
+            (5, "06:00", "12:00"), (6, "06:00", "12:00"),
+        ],
+        "demo_staff_15": [
+            (0, "08:00", "16:00"), (2, "08:00", "16:00"),
+            (4, "08:00", "16:00"), (6, "08:00", "16:00"),
+        ],
+    }
+
+    for name, windows in schedule_by_name.items():
+        user = users_by_name.get(name)
+        if user:
+            add_windows(user.id, windows)
 
 
 def _reset_and_seed_demo(db: Session) -> dict:
@@ -114,15 +200,15 @@ def _reset_and_seed_demo(db: Session) -> dict:
         for index in range(1, 16)
     ]
 
-    all_user_ids = [manager_primary.id, manager_secondary.id, manager_third.id, *[user.id for user in staff_users]]
-    _seed_full_week_availability(db, workplace.id, all_user_ids)
+    all_users = [manager_primary, manager_secondary, manager_third, *staff_users]
+    _seed_realistic_demo_availability(db, workplace.id, all_users)
     db.commit()
 
     return {
         "status": "demo reset complete",
         "workplace": demo_workplace_name,
         "roster_generated": False,
-        "manager_usernames": ["demo_manager", "demo_manager_2"],
+        "manager_usernames": ["demo_manager", "demo_manager_2", "demo_manager_3"],
         "staff_usernames": [user.name for user in staff_users],
     }
 
