@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
-from app.api import auth, availability, onboarding, roster, users
+from app.api import admin, auth, availability, onboarding, roster, users
 from app.auth_utils import hash_password
 from app.db.base import Base
 from app.db.session import engine
@@ -221,6 +221,7 @@ app.include_router(users.router)
 app.include_router(availability.router)
 app.include_router(roster.router)
 app.include_router(auth.router)
+app.include_router(admin.router)
 
 
 @app.get("/")
