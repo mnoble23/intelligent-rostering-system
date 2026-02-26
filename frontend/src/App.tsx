@@ -262,6 +262,9 @@ export default function App() {
         </aside>
 
         <main className="app-content">
+          <p className="app-content__demo-banner">
+            Demo Environment: Data resets nightly at 05:00 (Ireland Time).
+          </p>
           {authzMessage && <p className="app-content__notice">{authzMessage}</p>}
           <Routes>
             <Route

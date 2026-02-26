@@ -98,6 +98,16 @@
   padding: 10px 16px 20px;
 }
 
+.app-content__demo-banner {
+  background: #fff8e8;
+  border: 1px solid #f2d398;
+  border-radius: 10px;
+  color: #6f4d14;
+  font-weight: 700;
+  margin: 6px 0 12px;
+  padding: 9px 12px;
+}
+
 .app-content__notice {
   background: #fff1f1;
   border: 1px solid #f0cdcd;
