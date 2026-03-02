@@ -62,7 +62,8 @@ export default function GenerateRoster({ refreshRoster, refreshWeeks, startDate 
       }
     } catch (err) {
       console.error(err);
-      setStatus("Generation failed. Please check availability and staffing limits, then try again.");
+      const detail = (err as any)?.response?.data?.detail;
+      setStatus(typeof detail === "string" ? detail : "Generation failed. Please check availability and staffing limits, then try again.");
       setStatusType("error");
     }
   };

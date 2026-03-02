@@ -6,6 +6,7 @@ import API, { setAuthErrorHandlers, setAuthToken } from "./services/api";
 import RosterTable from "./components/RosterTable";
 import UserAvailabilityForm from "./components/UserAvailabilityForm";
 import GenerateRoster from "./components/GenerateRoster";
+import WorkplaceConstraints from "./components/WorkplaceConstraints";
 import ManageShiftAssignments from "./components/ManageShiftAssignments";
 import DeleteRosterWeek from "./components/DeleteRosterWeek";
 import RemoveUser from "./components/RemoveUser";
@@ -217,6 +218,7 @@ export default function App() {
       ? [
           { to: "/", label: "Roster Dashboard" },
           { to: "/shift-coverage", label: "Shift Coverage" },
+          { to: "/workplace-constraints", label: "Workplace Constraints" },
           { to: "/generate-roster", label: "Generate Roster" },
           { to: "/manage-shifts", label: "Manage Shifts" },
           { to: "/delete-roster-week", label: "Delete Roster Week" },
@@ -306,6 +308,14 @@ export default function App() {
               element={(
                 <RoleGate role={role} allowedRoles={["manager", "staff"]}>
                   <UserAvailabilityForm />
+                </RoleGate>
+              )}
+            />
+            <Route
+              path="/workplace-constraints"
+              element={(
+                <RoleGate role={role} allowedRoles={["manager"]}>
+                  <WorkplaceConstraints />
                 </RoleGate>
               )}
             />
