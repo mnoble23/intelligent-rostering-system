@@ -11,11 +11,11 @@ from app.db.session import get_db
 from app.models.shift_assignment_db import ShiftAssignmentDB
 from app.models.shift_db import ShiftDB
 from app.models.user_db import UserDB
+from app.models.workplace_db import WorkplaceDB
 from app.services.availability_loader import load_weekly_availability
 from app.services.roster_generator import (
     BUSINESS_END,
     BUSINESS_START,
-    MIN_STAFF_PER_SHIFT,
     assign_staff_to_shifts,
     generate_weekly_shifts,
     match_availability_to_shifts,
@@ -73,6 +73,13 @@ def resolve_week_start(db: Session, workplace_id: int, requested_week_start: dat
     return None
 
 
+def get_workplace_constraints(db: Session, workplace_id: int) -> tuple[int, int]:
+    workplace = db.query(WorkplaceDB).filter_by(id=workplace_id).first()
+    if workplace is None:
+        raise HTTPException(status_code=404, detail="Workplace not found")
+    return workplace.min_staff_per_shift, workplace.min_managers_per_hour
+
+
 @router.get("/debug/availability")
 def debug_availability(
     db: Session = Depends(get_db),
@@ -115,6 +122,7 @@ def debug_assigned_shifts(
     current_user: UserDB = Depends(require_manager),
 ):
     availability_map = load_weekly_availability(db, current_user.workplace_id)
+    min_staff_per_shift, min_managers_per_hour = get_workplace_constraints(db, current_user.workplace_id)
 
     week_start = get_week_start(date.today())
     weekly_shifts = generate_weekly_shifts(week_start)
@@ -135,8 +143,10 @@ def debug_assigned_shifts(
         staffable_shifts,
         week_start_date=week_start,
         workplace_id=current_user.workplace_id,
+        min_staff_per_shift=min_staff_per_shift,
         user_hour_limits=user_hour_limits,
         user_roles=user_roles,
+        min_managers_per_hour=min_managers_per_hour,
     )
 
     return {
@@ -159,6 +169,7 @@ def generate_roster(
     current_user: UserDB = Depends(require_manager),
 ):
     weekly_availability = load_weekly_availability(db, current_user.workplace_id)
+    min_staff_per_shift, min_managers_per_hour = get_workplace_constraints(db, current_user.workplace_id)
     users = db.query(UserDB).filter_by(workplace_id=current_user.workplace_id).all()
     user_hour_limits = {
         user.id: (float(user.min_hours), float(user.max_hours))
@@ -183,8 +194,10 @@ def generate_roster(
                 staffable_shifts,
                 week_start_date=week_start,
                 workplace_id=current_user.workplace_id,
+                min_staff_per_shift=min_staff_per_shift,
                 user_hour_limits=user_hour_limits,
                 user_roles=user_roles,
+                min_managers_per_hour=min_managers_per_hour,
             )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -308,6 +321,7 @@ def get_shift_coverage(
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(require_manager),
 ):
+    min_staff_per_shift, _ = get_workplace_constraints(db, current_user.workplace_id)
     resolved_week_start = resolve_week_start(db, current_user.workplace_id, week_start_date)
     if resolved_week_start is None:
         return {
@@ -316,7 +330,7 @@ def get_shift_coverage(
                 "start": f"{BUSINESS_START:02d}:00",
                 "end": f"{BUSINESS_END:02d}:00",
             },
-            "minimum_staff_per_shift": MIN_STAFF_PER_SHIFT,
+            "minimum_staff_per_shift": min_staff_per_shift,
             "summary": {
                 "fully_staffed_hours": 0,
                 "understaffed_hours": 0,
@@ -352,7 +366,7 @@ def get_shift_coverage(
                 if shift.start_time <= hour_start and shift.end_time >= hour_end
             ]
 
-            required_staff = MIN_STAFF_PER_SHIFT
+            required_staff = min_staff_per_shift
             assigned_staff_ids: Set[int] = set()
             for shift in active_shifts:
                 assigned_staff_ids.update(staff_by_shift.get(shift.id, set()))
@@ -382,7 +396,7 @@ def get_shift_coverage(
             "start": f"{BUSINESS_START:02d}:00",
             "end": f"{BUSINESS_END:02d}:00",
         },
-        "minimum_staff_per_shift": MIN_STAFF_PER_SHIFT,
+        "minimum_staff_per_shift": min_staff_per_shift,
         "summary": {
             "fully_staffed_hours": fully_staffed_hours,
             "understaffed_hours": understaffed_hours,
