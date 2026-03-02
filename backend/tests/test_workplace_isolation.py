@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
-from app.api import auth, availability, roster, users
+from app.api import auth, availability, roster, users, workplace
 from app.auth_utils import create_access_token, hash_password
 from app.db.base import Base
 from app.db.session import get_db
@@ -35,6 +35,7 @@ def _build_test_client() -> tuple[TestClient, sessionmaker]:
     app.include_router(availability.router)
     app.include_router(roster.router)
     app.include_router(auth.router)
+    app.include_router(workplace.router)
 
     def override_get_db():
         db = TestingSessionLocal()
@@ -235,3 +236,45 @@ def test_auth_rejects_token_with_mismatched_workplace_claim():
     )
     assert response.status_code == 401
     assert response.json()["detail"] == "Token workplace mismatch"
+
+
+def test_workplace_constraints_can_be_read_and_updated_by_manager():
+    client, SessionLocal = _build_test_client()
+
+    with SessionLocal() as session:
+        _seed_two_workplaces(session)
+
+    manager_a_token = _login(client, "manager_a", "ManagerA123!")
+
+    get_response = client.get(
+        "/workplace/constraints",
+        headers={"Authorization": f"Bearer {manager_a_token}"},
+    )
+    assert get_response.status_code == 200
+    assert get_response.json()["min_staff_per_shift"] == 2
+    assert get_response.json()["min_managers_per_hour"] == 1
+
+    put_response = client.put(
+        "/workplace/constraints",
+        headers={"Authorization": f"Bearer {manager_a_token}"},
+        json={"min_staff_per_shift": 3, "min_managers_per_hour": 1},
+    )
+    assert put_response.status_code == 200
+    assert put_response.json()["min_staff_per_shift"] == 3
+    assert put_response.json()["min_managers_per_hour"] == 1
+
+
+def test_workplace_constraints_reject_invalid_manager_requirements():
+    client, SessionLocal = _build_test_client()
+
+    with SessionLocal() as session:
+        _seed_two_workplaces(session)
+
+    manager_a_token = _login(client, "manager_a", "ManagerA123!")
+    bad_update = client.put(
+        "/workplace/constraints",
+        headers={"Authorization": f"Bearer {manager_a_token}"},
+        json={"min_staff_per_shift": 1, "min_managers_per_hour": 2},
+    )
+    assert bad_update.status_code == 400
+    assert bad_update.json()["detail"] == "min_managers_per_hour cannot exceed min_staff_per_shift"
