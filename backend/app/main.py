@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
-from app.api import admin, auth, availability, onboarding, roster, users
+from app.api import admin, auth, availability, onboarding, roster, users, workplace
 from app.auth_utils import hash_password
 from app.db.base import Base
 from app.db.session import engine
@@ -35,6 +35,7 @@ with engine.begin() as connection:
     shift_columns = {column["name"] for column in inspector.get_columns("shift")}
     availability_columns = {column["name"] for column in inspector.get_columns("availability")}
     assignment_columns = {column["name"] for column in inspector.get_columns("shift_assignment")}
+    workplace_columns = {column["name"] for column in inspector.get_columns("workplace")}
 
     if "min_hours" not in user_columns:
         connection.execute(
@@ -67,6 +68,33 @@ with engine.begin() as connection:
     if "workplace_id" not in user_columns:
         connection.execute(
             text('ALTER TABLE "user" ADD COLUMN workplace_id INTEGER')
+        )
+
+    if "min_staff_per_shift" not in workplace_columns:
+        connection.execute(
+            text('ALTER TABLE "workplace" ADD COLUMN min_staff_per_shift INTEGER')
+        )
+        connection.execute(
+            text('UPDATE "workplace" SET min_staff_per_shift = 2 WHERE min_staff_per_shift IS NULL')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN min_staff_per_shift SET DEFAULT 2')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN min_staff_per_shift SET NOT NULL')
+        )
+    if "min_managers_per_hour" not in workplace_columns:
+        connection.execute(
+            text('ALTER TABLE "workplace" ADD COLUMN min_managers_per_hour INTEGER')
+        )
+        connection.execute(
+            text('UPDATE "workplace" SET min_managers_per_hour = 1 WHERE min_managers_per_hour IS NULL')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN min_managers_per_hour SET DEFAULT 1')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN min_managers_per_hour SET NOT NULL')
         )
 
     default_workplace_row = connection.execute(
@@ -221,6 +249,7 @@ app.include_router(users.router)
 app.include_router(availability.router)
 app.include_router(roster.router)
 app.include_router(auth.router)
+app.include_router(workplace.router)
 app.include_router(admin.router)
 
 
