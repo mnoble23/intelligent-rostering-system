@@ -363,6 +363,21 @@ def assign_staff_to_shifts(
             f"First uncovered slot: day={first_uncovered_day}, hour={first_uncovered_hour:02d}:00."
         )
 
+    uncovered_staff_hours: List[Tuple[int, int]] = []
+    for day in range(7):
+        for hour in range(BUSINESS_START, BUSINESS_END):
+            if hourly_assigned_staff_by_day[day][hour] < min_staff_per_shift:
+                uncovered_staff_hours.append((day, hour))
+    if uncovered_staff_hours:
+        first_uncovered_day, first_uncovered_hour = uncovered_staff_hours[0]
+        assigned_count = hourly_assigned_staff_by_day[first_uncovered_day][first_uncovered_hour]
+        raise ValueError(
+            f"Unable to generate roster with minimum staff coverage. "
+            f"First uncovered slot: day={first_uncovered_day}, "
+            f"hour={first_uncovered_hour:02d}:00, "
+            f"assigned={assigned_count}, required={min_staff_per_shift}."
+        )
+
     existing_shift_ids = [
         shift_id
         for (shift_id,) in db.query(ShiftDB.id)
