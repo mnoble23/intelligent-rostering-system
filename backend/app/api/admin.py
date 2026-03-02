@@ -124,6 +124,9 @@ def _seed_realistic_demo_availability(db: Session, workplace_id: int, users: lis
             (0, "08:00", "16:00"), (2, "08:00", "16:00"),
             (4, "08:00", "16:00"), (6, "08:00", "16:00"),
         ],
+        "demo_staff_16": [
+            (2, "16:00", "22:00"),
+        ],
     }
 
     for name, windows in schedule_by_name.items():
@@ -187,7 +190,7 @@ def _reset_and_seed_demo(db: Session) -> dict:
             min_hours=10.0,
             max_hours=40.0,
         )
-        for index in range(1, 16)
+        for index in range(1, 17)
     ]
 
     all_users = [manager_primary, manager_secondary, manager_third, *staff_users]
