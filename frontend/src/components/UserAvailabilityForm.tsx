@@ -22,6 +22,8 @@ export default function UserAvailabilityForm() {
   const [role, setRole] = useState<"staff" | "manager">("staff");
   const [minHours, setMinHours] = useState(0);
   const [maxHours, setMaxHours] = useState(40);
+  const [minShiftsPerWeek, setMinShiftsPerWeek] = useState(1);
+  const [maxShiftsPerWeek, setMaxShiftsPerWeek] = useState(7);
   const [availability, setAvailability] = useState<Availability[]>([
     { day_of_week: 0, start_time: "", end_time: "", is_full_day: false },
   ]);
@@ -110,6 +112,16 @@ export default function UserAvailabilityForm() {
       setStatusType("error");
       return;
     }
+    if (minShiftsPerWeek < 0 || maxShiftsPerWeek < 0) {
+      setStatus("Minimum and maximum shifts must be zero or greater.");
+      setStatusType("error");
+      return;
+    }
+    if (maxShiftsPerWeek < minShiftsPerWeek) {
+      setStatus("Maximum shifts must be greater than or equal to minimum shifts.");
+      setStatusType("error");
+      return;
+    }
 
     for (const av of availability) {
       if (!av.start_time || !av.end_time) {
@@ -132,6 +144,8 @@ export default function UserAvailabilityForm() {
           role,
           min_hours: minHours,
           max_hours: maxHours,
+          min_shifts_per_week: minShiftsPerWeek,
+          max_shifts_per_week: maxShiftsPerWeek,
         });
         userId = userRes.data.id;
       } else {
@@ -164,6 +178,8 @@ export default function UserAvailabilityForm() {
         setRole("staff");
         setMinHours(0);
         setMaxHours(40);
+        setMinShiftsPerWeek(1);
+        setMaxShiftsPerWeek(7);
       }
       setAvailability([{ day_of_week: 0, start_time: "", end_time: "", is_full_day: false }]);
     } catch (err) {
@@ -226,6 +242,28 @@ export default function UserAvailabilityForm() {
                   step={0.5}
                   value={maxHours}
                   onChange={e => setMaxHours(Number(e.target.value))}
+                />
+              </label>
+              <label className="availability-form__field">
+                <span>Min Weekly Shifts</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={7}
+                  step={1}
+                  value={minShiftsPerWeek}
+                  onChange={e => setMinShiftsPerWeek(Number(e.target.value))}
+                />
+              </label>
+              <label className="availability-form__field">
+                <span>Max Weekly Shifts</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={7}
+                  step={1}
+                  value={maxShiftsPerWeek}
+                  onChange={e => setMaxShiftsPerWeek(Number(e.target.value))}
                 />
               </label>
             </>
