@@ -8,6 +8,78 @@ interface GenerateRosterProps {
   startDate?: string;
 }
 
+type RosterErrorDetail = {
+  message?: string;
+  explanation?: string;
+  suggestions?: string[];
+  context?: {
+    day_label?: string;
+    hour_label?: string;
+    assigned_staff?: number;
+    required_staff?: number;
+    required_managers_per_hour?: number;
+    user_id?: number;
+    assigned_shifts?: number;
+    required_shifts?: number;
+  };
+};
+
+function buildRosterErrorMessage(err: unknown) {
+  const detail = (err as any)?.response?.data?.detail;
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  if (detail && typeof detail === "object") {
+    const parsed = detail as RosterErrorDetail;
+    const parts: string[] = [];
+    if (parsed.message) {
+      parts.push(parsed.message);
+    }
+    if (parsed.explanation) {
+      parts.push(parsed.explanation);
+    }
+
+    const contextParts: string[] = [];
+    if (parsed.context?.day_label && parsed.context?.hour_label) {
+      contextParts.push(`First uncovered time: ${parsed.context.day_label} at ${parsed.context.hour_label}.`);
+    }
+    if (
+      typeof parsed.context?.assigned_staff === "number"
+      && typeof parsed.context?.required_staff === "number"
+    ) {
+      contextParts.push(
+        `Assigned staff: ${parsed.context.assigned_staff}, required: ${parsed.context.required_staff}.`
+      );
+    }
+    if (typeof parsed.context?.required_managers_per_hour === "number") {
+      contextParts.push(`Required managers per hour: ${parsed.context.required_managers_per_hour}.`);
+    }
+    if (
+      typeof parsed.context?.user_id === "number"
+      && typeof parsed.context?.assigned_shifts === "number"
+      && typeof parsed.context?.required_shifts === "number"
+    ) {
+      contextParts.push(
+        `User ${parsed.context.user_id} shifts: ${parsed.context.assigned_shifts}/${parsed.context.required_shifts}.`
+      );
+    }
+    if (contextParts.length > 0) {
+      parts.push(contextParts.join(" "));
+    }
+
+    if (Array.isArray(parsed.suggestions) && parsed.suggestions.length > 0) {
+      parts.push(`Try: ${parsed.suggestions.slice(0, 2).join(" ")}`);
+    }
+
+    if (parts.length > 0) {
+      return parts.join(" ");
+    }
+  }
+
+  return "Generation failed. Please check availability and staffing limits, then try again.";
+}
+
 function toIsoWeek(value?: string) {
   if (!value) return "";
   const [year, month, day] = value.split("-").map(Number);
@@ -62,8 +134,7 @@ export default function GenerateRoster({ refreshRoster, refreshWeeks, startDate 
       }
     } catch (err) {
       console.error(err);
-      const detail = (err as any)?.response?.data?.detail;
-      setStatus(typeof detail === "string" ? detail : "Generation failed. Please check availability and staffing limits, then try again.");
+      setStatus(buildRosterErrorMessage(err));
       setStatusType("error");
     }
   };
