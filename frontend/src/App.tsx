@@ -192,7 +192,7 @@ export default function App() {
       return <Login onLoginSuccess={user => {
         setAuthUser(user);
         setAuthzMessage("");
-      }} />;
+      }} onBack={() => setAuthView("chooser")} />;
     }
 
     if (authView === "create") {
@@ -200,7 +200,7 @@ export default function App() {
         setAuthUser(user);
         setIsBootstrapped(true);
         setAuthzMessage("");
-      }} />;
+      }} onBack={() => setAuthView("chooser")} />;
     }
 
     return (

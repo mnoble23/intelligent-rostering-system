@@ -11,6 +11,7 @@ interface AuthUser {
 
 interface CreateWorkplaceProps {
   onCreateSuccess: (user: AuthUser) => void;
+  onBack: () => void;
 }
 
 interface CreateWorkplaceResponse {
@@ -19,7 +20,7 @@ interface CreateWorkplaceResponse {
   user: AuthUser;
 }
 
-export default function CreateWorkplace({ onCreateSuccess }: CreateWorkplaceProps) {
+export default function CreateWorkplace({ onCreateSuccess, onBack }: CreateWorkplaceProps) {
   const [workplaceName, setWorkplaceName] = useState("");
   const [managerName, setManagerName] = useState("");
   const [password, setPassword] = useState("");
@@ -93,9 +94,14 @@ export default function CreateWorkplace({ onCreateSuccess }: CreateWorkplaceProp
 
         {status && <p className="login-page__status">{status}</p>}
 
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Creating..." : "Create Workplace"}
-        </button>
+        <div className="login-page__actions">
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Creating..." : "Create Workplace"}
+          </button>
+          <button type="button" className="login-page__button--secondary" onClick={onBack} disabled={isSubmitting}>
+            Back to Selection
+          </button>
+        </div>
       </form>
     </main>
   );

@@ -11,6 +11,7 @@ interface AuthUser {
 
 interface LoginProps {
   onLoginSuccess: (user: AuthUser) => void;
+  onBack: () => void;
 }
 
 interface LoginResponse {
@@ -19,7 +20,7 @@ interface LoginResponse {
   user: AuthUser;
 }
 
-export default function Login({ onLoginSuccess }: LoginProps) {
+export default function Login({ onLoginSuccess, onBack }: LoginProps) {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("");
@@ -80,9 +81,14 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
         {status && <p className="login-page__status">{status}</p>}
 
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Signing in..." : "Sign In"}
-        </button>
+        <div className="login-page__actions">
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Signing in..." : "Sign In"}
+          </button>
+          <button type="button" className="login-page__button--secondary" onClick={onBack} disabled={isSubmitting}>
+            Back to Selection
+          </button>
+        </div>
       </form>
     </main>
   );

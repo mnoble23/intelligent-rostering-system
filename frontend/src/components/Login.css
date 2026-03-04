@@ -67,6 +67,17 @@
   opacity: 0.8;
 }
 
+.login-page__actions {
+  display: grid;
+  gap: 10px;
+}
+
+.login-page__button--secondary {
+  background: #ffffff !important;
+  border: 1px solid #9fb6cb !important;
+  color: #1d3f5c !important;
+}
+
 .auth-choice__actions {
   display: grid;
   gap: 10px;
