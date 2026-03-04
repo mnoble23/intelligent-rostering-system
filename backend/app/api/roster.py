@@ -73,11 +73,16 @@ def resolve_week_start(db: Session, workplace_id: int, requested_week_start: dat
     return None
 
 
-def get_workplace_constraints(db: Session, workplace_id: int) -> tuple[int, int]:
+def get_workplace_constraints(db: Session, workplace_id: int) -> tuple[int, int, int, int]:
     workplace = db.query(WorkplaceDB).filter_by(id=workplace_id).first()
     if workplace is None:
         raise HTTPException(status_code=404, detail="Workplace not found")
-    return workplace.min_staff_per_shift, workplace.min_managers_per_hour
+    return (
+        workplace.min_staff_per_shift,
+        workplace.min_managers_per_hour,
+        workplace.max_consecutive_shifts,
+        workplace.min_hours_between_shifts,
+    )
 
 
 @router.get("/debug/availability")
@@ -122,7 +127,12 @@ def debug_assigned_shifts(
     current_user: UserDB = Depends(require_manager),
 ):
     availability_map = load_weekly_availability(db, current_user.workplace_id)
-    min_staff_per_shift, min_managers_per_hour = get_workplace_constraints(db, current_user.workplace_id)
+    (
+        min_staff_per_shift,
+        min_managers_per_hour,
+        max_consecutive_shifts,
+        min_hours_between_shifts,
+    ) = get_workplace_constraints(db, current_user.workplace_id)
 
     week_start = get_week_start(date.today())
     weekly_shifts = generate_weekly_shifts(week_start)
@@ -147,6 +157,8 @@ def debug_assigned_shifts(
         user_hour_limits=user_hour_limits,
         user_roles=user_roles,
         min_managers_per_hour=min_managers_per_hour,
+        max_consecutive_shifts=max_consecutive_shifts,
+        min_hours_between_shifts=min_hours_between_shifts,
     )
 
     return {
@@ -169,7 +181,12 @@ def generate_roster(
     current_user: UserDB = Depends(require_manager),
 ):
     weekly_availability = load_weekly_availability(db, current_user.workplace_id)
-    min_staff_per_shift, min_managers_per_hour = get_workplace_constraints(db, current_user.workplace_id)
+    (
+        min_staff_per_shift,
+        min_managers_per_hour,
+        max_consecutive_shifts,
+        min_hours_between_shifts,
+    ) = get_workplace_constraints(db, current_user.workplace_id)
     users = db.query(UserDB).filter_by(workplace_id=current_user.workplace_id).all()
     user_hour_limits = {
         user.id: (float(user.min_hours), float(user.max_hours))
@@ -198,6 +215,8 @@ def generate_roster(
                 user_hour_limits=user_hour_limits,
                 user_roles=user_roles,
                 min_managers_per_hour=min_managers_per_hour,
+                max_consecutive_shifts=max_consecutive_shifts,
+                min_hours_between_shifts=min_hours_between_shifts,
             )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -321,7 +340,7 @@ def get_shift_coverage(
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(require_manager),
 ):
-    min_staff_per_shift, _ = get_workplace_constraints(db, current_user.workplace_id)
+    min_staff_per_shift, _, _, _ = get_workplace_constraints(db, current_user.workplace_id)
     resolved_week_start = resolve_week_start(db, current_user.workplace_id, week_start_date)
     if resolved_week_start is None:
         return {
