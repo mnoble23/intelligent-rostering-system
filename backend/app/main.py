@@ -45,6 +45,32 @@ with engine.begin() as connection:
         connection.execute(
             text('ALTER TABLE "user" ADD COLUMN max_hours FLOAT NOT NULL DEFAULT 40')
         )
+    if "min_shifts_per_week" not in user_columns:
+        connection.execute(
+            text('ALTER TABLE "user" ADD COLUMN min_shifts_per_week INTEGER')
+        )
+        connection.execute(
+            text('UPDATE "user" SET min_shifts_per_week = 1 WHERE min_shifts_per_week IS NULL')
+        )
+        connection.execute(
+            text('ALTER TABLE "user" ALTER COLUMN min_shifts_per_week SET DEFAULT 1')
+        )
+        connection.execute(
+            text('ALTER TABLE "user" ALTER COLUMN min_shifts_per_week SET NOT NULL')
+        )
+    if "max_shifts_per_week" not in user_columns:
+        connection.execute(
+            text('ALTER TABLE "user" ADD COLUMN max_shifts_per_week INTEGER')
+        )
+        connection.execute(
+            text('UPDATE "user" SET max_shifts_per_week = 7 WHERE max_shifts_per_week IS NULL')
+        )
+        connection.execute(
+            text('ALTER TABLE "user" ALTER COLUMN max_shifts_per_week SET DEFAULT 7')
+        )
+        connection.execute(
+            text('ALTER TABLE "user" ALTER COLUMN max_shifts_per_week SET NOT NULL')
+        )
     if "role" not in user_columns:
         connection.execute(
             text('ALTER TABLE "user" ADD COLUMN role VARCHAR NOT NULL DEFAULT \'staff\'')
