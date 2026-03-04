@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import date, time
+from datetime import date, datetime, time, timedelta
 from typing import Dict, List, Tuple
 
 from sqlalchemy.orm import Session
@@ -16,6 +16,8 @@ BUSINESS_END = 22
 ALLOWED_SHIFT_HOURS = (4, 6, 9)
 MIN_STAFF_PER_SHIFT = 2
 MIN_MANAGERS_PER_HOUR = 1
+MAX_CONSECUTIVE_SHIFTS = 5
+MIN_HOURS_BETWEEN_SHIFTS = 11
 MANAGER_ROLE = "manager"
 
 
@@ -83,6 +85,8 @@ def assign_staff_to_shifts(
     user_hour_limits: UserHourLimits | None = None,
     user_roles: UserRoles | None = None,
     min_managers_per_hour: int = MIN_MANAGERS_PER_HOUR,
+    max_consecutive_shifts: int = MAX_CONSECUTIVE_SHIFTS,
+    min_hours_between_shifts: int = MIN_HOURS_BETWEEN_SHIFTS,
 ) -> Dict[int, List[Shift]]:
     def shift_duration_hours(shift: Shift) -> float:
         return (
@@ -133,6 +137,41 @@ def assign_staff_to_shifts(
             available_candidates_by_shift[shift_id] = list(shift.staff)
             assigned_staff_by_shift[shift_id] = []
 
+    def shift_datetimes(shift: Shift) -> tuple[datetime, datetime]:
+        shift_date = week_start_date + timedelta(days=shift.day_of_week)
+        start_dt = datetime.combine(shift_date, shift.start_time)
+        end_dt = datetime.combine(shift_date, shift.end_time)
+        return start_dt, end_dt
+
+    def would_exceed_max_consecutive_shifts(user_id: int, candidate_day: int) -> bool:
+        assigned_days = set(user_daily_assignments.get(user_id, {}).keys())
+        assigned_days.add(candidate_day)
+        max_run = 0
+        current_run = 0
+        for day in range(7):
+            if day in assigned_days:
+                current_run += 1
+                max_run = max(max_run, current_run)
+            else:
+                current_run = 0
+        return max_run > max_consecutive_shifts
+
+    def has_minimum_rest_gap(user_id: int, candidate_shift: Shift) -> bool:
+        candidate_start, candidate_end = shift_datetimes(candidate_shift)
+        required_gap = timedelta(hours=min_hours_between_shifts)
+        for assigned_shifts_by_day in user_daily_assignments.get(user_id, {}).values():
+            for assigned_shift in assigned_shifts_by_day:
+                assigned_start, assigned_end = shift_datetimes(assigned_shift)
+                if candidate_start >= assigned_end:
+                    gap = candidate_start - assigned_end
+                elif assigned_start >= candidate_end:
+                    gap = assigned_start - candidate_end
+                else:
+                    return False
+                if gap < required_gap:
+                    return False
+        return True
+
     def can_assign_user_to_shift(user_id: int, shift_id: int) -> bool:
         shift = shift_lookup_by_id[shift_id]
         day = shift_day_by_id[shift_id]
@@ -140,6 +179,12 @@ def assign_staff_to_shifts(
         user_daily_assignments.setdefault(user_id, {}).setdefault(day, [])
         already_assigned_today = len(user_daily_assignments[user_id][day]) > 0
         if already_assigned_today:
+            return False
+
+        if would_exceed_max_consecutive_shifts(user_id, day):
+            return False
+
+        if not has_minimum_rest_gap(user_id, shift):
             return False
 
         _, max_hours = user_hour_limits.get(user_id, (0.0, float("inf")))
