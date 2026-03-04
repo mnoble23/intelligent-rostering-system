@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import API from "../services/api";
+import API, { formatApiError } from "../services/api";
 import "./RemoveUser.css";
 
 interface User {
@@ -68,9 +68,13 @@ export default function RemoveUser({ refreshRoster }: RemoveUserProps) {
       setStatusType("success");
       await loadUsers();
       if (refreshRoster) refreshRoster();
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      setStatus(typeof detail === "string" ? detail : "Failed to remove user.");
+    } catch (err: unknown) {
+      setStatus(formatApiError(err, {
+        fallbackMessage: "Failed to remove user.",
+        detailMap: {
+          "User not found": "That user no longer exists. Refresh and try again.",
+        },
+      }));
       setStatusType("error");
     }
   };

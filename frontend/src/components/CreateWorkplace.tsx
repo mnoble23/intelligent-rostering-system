@@ -1,5 +1,5 @@
 import { useState } from "react";
-import API, { setAuthToken } from "../services/api";
+import API, { formatApiError, setAuthToken } from "../services/api";
 import "./Login.css";
 
 interface AuthUser {
@@ -45,9 +45,16 @@ export default function CreateWorkplace({ onCreateSuccess, onBack }: CreateWorkp
       });
       setAuthToken(response.data.access_token);
       onCreateSuccess(response.data.user);
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      setStatus(typeof detail === "string" ? detail : "Failed to create workplace.");
+    } catch (err: unknown) {
+      setStatus(formatApiError(err, {
+        fallbackMessage: "Failed to create workplace.",
+        detailMap: {
+          "Workplace has already been created": "A workplace is already set up. Sign in with the existing manager account.",
+          "Workplace name is required": "Enter a workplace name.",
+          "Manager name is required": "Enter a manager name.",
+          "password must be at least 8 characters": "Password must be at least 8 characters.",
+        },
+      }));
     } finally {
       setIsSubmitting(false);
     }

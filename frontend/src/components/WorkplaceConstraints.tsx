@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import API from "../services/api";
+import API, { formatApiError } from "../services/api";
 import "./WorkplaceConstraints.css";
 
 interface WorkplaceConstraintsResponse {
@@ -8,6 +8,39 @@ interface WorkplaceConstraintsResponse {
   min_managers_per_hour: number;
   max_consecutive_shifts: number;
   min_hours_between_shifts: number;
+}
+
+function validateConstraints(values: WorkplaceConstraintsResponse) {
+  const fields = [
+    values.min_staff_per_shift,
+    values.min_managers_per_hour,
+    values.max_consecutive_shifts,
+    values.min_hours_between_shifts,
+  ];
+
+  if (fields.some(value => !Number.isFinite(value))) {
+    return "All constraint values must be valid numbers.";
+  }
+  if (fields.some(value => !Number.isInteger(value))) {
+    return "All constraints must be whole numbers.";
+  }
+  if (values.min_staff_per_shift < 1 || values.min_staff_per_shift > 20) {
+    return "Min staff per shift must be between 1 and 20.";
+  }
+  if (values.min_managers_per_hour < 0 || values.min_managers_per_hour > 10) {
+    return "Min managers per hour must be between 0 and 10.";
+  }
+  if (values.max_consecutive_shifts < 1 || values.max_consecutive_shifts > 7) {
+    return "Max consecutive shifts must be between 1 and 7.";
+  }
+  if (values.min_hours_between_shifts < 0 || values.min_hours_between_shifts > 24) {
+    return "Min hours between shifts must be between 0 and 24.";
+  }
+  if (values.min_managers_per_hour > values.min_staff_per_shift) {
+    return "Min managers per hour cannot exceed min staff per shift.";
+  }
+
+  return null;
 }
 
 export default function WorkplaceConstraints() {
@@ -31,7 +64,7 @@ export default function WorkplaceConstraints() {
       } catch (err) {
         console.error(err);
         if (!cancelled) {
-          setStatus("Failed to load workplace constraints.");
+          setStatus(formatApiError(err, { fallbackMessage: "Failed to load workplace constraints." }));
           setStatusType("error");
         }
       }
@@ -56,6 +89,12 @@ export default function WorkplaceConstraints() {
 
   const handleSave = async () => {
     if (!constraints) return;
+    const validationError = validateConstraints(constraints);
+    if (validationError) {
+      setStatus(validationError);
+      setStatusType("error");
+      return;
+    }
 
     setStatus("Saving workplace constraints...");
     setStatusType("loading");
@@ -69,10 +108,14 @@ export default function WorkplaceConstraints() {
       setConstraints(response.data);
       setStatus("Constraints saved.");
       setStatusType("success");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      const detail = err?.response?.data?.detail;
-      setStatus(typeof detail === "string" ? detail : "Failed to save workplace constraints.");
+      setStatus(formatApiError(err, {
+        fallbackMessage: "Failed to save workplace constraints.",
+        detailMap: {
+          "min_managers_per_hour cannot exceed min_staff_per_shift": "Min managers per hour cannot exceed min staff per shift.",
+        },
+      }));
       setStatusType("error");
     }
   };

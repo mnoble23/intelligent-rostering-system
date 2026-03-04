@@ -1,5 +1,5 @@
 import { useState } from "react";
-import API, { setAuthToken } from "../services/api";
+import API, { formatApiError, setAuthToken } from "../services/api";
 import "./Login.css";
 
 interface AuthUser {
@@ -43,9 +43,15 @@ export default function Login({ onLoginSuccess, onBack }: LoginProps) {
       });
       setAuthToken(response.data.access_token);
       onLoginSuccess(response.data.user);
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      setStatus(typeof detail === "string" ? detail : "Login failed.");
+    } catch (err: unknown) {
+      setStatus(formatApiError(err, {
+        fallbackMessage: "Login failed.",
+        detailMap: {
+          "Invalid name or password": "Name or password is incorrect. Check your credentials and try again.",
+          "User is inactive": "Your account is inactive. Ask a manager to reactivate it.",
+          "Token workplace mismatch": "This account belongs to a different workplace.",
+        },
+      }));
     } finally {
       setIsSubmitting(false);
     }

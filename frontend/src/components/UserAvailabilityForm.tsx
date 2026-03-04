@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import API from "../services/api";
+import API, { formatApiError } from "../services/api";
 import "./UserAvailabilityForm.css";
 
 interface Availability {
@@ -13,6 +13,11 @@ interface AuthUser {
   id: number;
   name: string;
   role: "staff" | "manager";
+}
+
+function hhmmToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
 }
 
 export default function UserAvailabilityForm() {
@@ -44,7 +49,7 @@ export default function UserAvailabilityForm() {
       })
       .catch(err => {
         console.error(err);
-        setStatus("Failed to load authenticated user.");
+        setStatus(formatApiError(err, { fallbackMessage: "Failed to load authenticated user." }));
         setStatusType("error");
       });
   }, []);
@@ -135,6 +140,23 @@ export default function UserAvailabilityForm() {
         return;
       }
     }
+    for (let day = 0; day < 7; day += 1) {
+      const dayEntries = availability
+        .filter(av => av.day_of_week === day)
+        .map(av => ({
+          start: hhmmToMinutes(av.start_time),
+          end: hhmmToMinutes(av.end_time),
+        }))
+        .sort((a, b) => a.start - b.start);
+
+      for (let i = 1; i < dayEntries.length; i += 1) {
+        if (dayEntries[i].start < dayEntries[i - 1].end) {
+          setStatus(`Availability blocks overlap on ${days[day]}. Adjust times and try again.`);
+          setStatusType("error");
+          return;
+        }
+      }
+    }
 
     try {
       let userId: number | null = null;
@@ -182,9 +204,21 @@ export default function UserAvailabilityForm() {
         setMaxShiftsPerWeek(7);
       }
       setAvailability([{ day_of_week: 0, start_time: "", end_time: "", is_full_day: false }]);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
-      setStatus("Failed to submit. Check console for details.");
+      setStatus(formatApiError(err, {
+        fallbackMessage: "Failed to submit user and availability details.",
+        detailMap: {
+          "At least one availability entry is required": "Add at least one availability block before submitting.",
+          "You can only manage your own availability": "You can only submit your own availability with this account.",
+          "One or more users are not in your workplace": "Selected user is not in this workplace.",
+          "Name is required": "Enter a user name before submitting.",
+          "role must be 'manager' or 'staff'": "Role must be either manager or staff.",
+          "max_hours must be greater than or equal to min_hours": "Max weekly hours must be greater than or equal to min weekly hours.",
+          "max_shifts_per_week must be greater than or equal to min_shifts_per_week": "Max weekly shifts must be greater than or equal to min weekly shifts.",
+          "password must be at least 8 characters": "Generated user password must be at least 8 characters.",
+        },
+      }));
       setStatusType("error");
     }
   };

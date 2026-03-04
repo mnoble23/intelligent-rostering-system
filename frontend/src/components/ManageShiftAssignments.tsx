@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import API from "../services/api";
+import API, { formatApiError } from "../services/api";
 import RosterTable, { type EmployeeRow, type ShiftAssignment } from "./RosterTable";
 import "./ManageShiftAssignments.css";
 
@@ -36,6 +36,12 @@ function toHHMM(timeStr: string) {
   return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
 }
 
+function validateShiftRange(start: string, end: string) {
+  if (!start || !end) return "Choose both start and end times.";
+  if (end <= start) return "End time must be later than start time.";
+  return null;
+}
+
 interface ManageShiftAssignmentsProps {
   weekStartDate?: string;
 }
@@ -60,7 +66,7 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
       setShifts(shiftsRes.data);
     } catch (err) {
       console.error(err);
-      setStatus("Failed to load users and shifts.");
+      setStatus(formatApiError(err, { fallbackMessage: "Failed to load users and shifts." }));
     }
   }, [weekStartDate]);
 
@@ -133,6 +139,11 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
       setStatus("Select a roster cell first.");
       return;
     }
+    const validationError = validateShiftRange(startTime, endTime);
+    if (validationError) {
+      setStatus(validationError);
+      return;
+    }
     setIsSubmitting(true);
     setStatus("");
     try {
@@ -143,9 +154,17 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
       setStatus("Shift added.");
       await loadData();
       setSelectedCell(null);
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      setStatus(typeof detail === "string" ? detail : "Failed to add shift.");
+    } catch (err: unknown) {
+      setStatus(formatApiError(err, {
+        fallbackMessage: "Failed to add shift.",
+        detailMap: {
+          "Shift not found": "Selected shift could not be found. Reload and try again.",
+          "User not found": "User could not be found in this workplace.",
+          "User already assigned to this shift": "This user is already assigned to that shift.",
+          "day_of_week must be between 0 and 6": "Selected day is invalid. Close and reopen this dialog.",
+          "end_time must be later than start_time": "End time must be later than start time.",
+        },
+      }));
     } finally {
       setIsSubmitting(false);
     }
@@ -163,9 +182,15 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
       setStatus("Shift removed.");
       await loadData();
       setSelectedCell(null);
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      setStatus(typeof detail === "string" ? detail : "Failed to remove shift.");
+    } catch (err: unknown) {
+      setStatus(formatApiError(err, {
+        fallbackMessage: "Failed to remove shift.",
+        detailMap: {
+          "Assignment not found": "This assignment was already removed. Reload and try again.",
+          "Shift not found": "Selected shift could not be found. Reload and try again.",
+          "User not found": "User could not be found in this workplace.",
+        },
+      }));
     } finally {
       setIsSubmitting(false);
     }
@@ -174,6 +199,11 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
   const handleChange = async () => {
     if (!selectedCell || currentShiftId === "") {
       setStatus("Select a cell where this employee already has a shift.");
+      return;
+    }
+    const validationError = validateShiftRange(startTime, endTime);
+    if (validationError) {
+      setStatus(validationError);
       return;
     }
     setIsSubmitting(true);
@@ -191,9 +221,18 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
       setStatus("Shift changed.");
       await loadData();
       setSelectedCell(null);
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      setStatus(typeof detail === "string" ? detail : "Failed to change shift.");
+    } catch (err: unknown) {
+      setStatus(formatApiError(err, {
+        fallbackMessage: "Failed to change shift.",
+        detailMap: {
+          "Assignment not found": "Current assignment no longer exists. Reload and try again.",
+          "Shift not found": "Target shift could not be found. Reload and try again.",
+          "User not found": "User could not be found in this workplace.",
+          "User already assigned to this shift": "This user is already assigned to that shift.",
+          "day_of_week must be between 0 and 6": "Selected day is invalid. Close and reopen this dialog.",
+          "end_time must be later than start_time": "End time must be later than start time.",
+        },
+      }));
     } finally {
       setIsSubmitting(false);
     }

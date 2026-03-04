@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import API from "../services/api";
+import API, { formatApiError } from "../services/api";
 import "./DeleteRosterWeek.css";
 
 interface DeleteRosterWeekProps {
@@ -72,9 +72,13 @@ export default function DeleteRosterWeek({
       setStatusType("success");
       if (refreshWeeks) refreshWeeks();
       if (refreshRoster) refreshRoster();
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      setStatus(typeof detail === "string" ? detail : "Failed to delete roster week.");
+    } catch (err: unknown) {
+      setStatus(formatApiError(err, {
+        fallbackMessage: "Failed to delete roster week.",
+        detailMap: {
+          "Roster week not found": "That roster week no longer exists. Refresh weeks and try again.",
+        },
+      }));
       setStatusType("error");
     }
   };
