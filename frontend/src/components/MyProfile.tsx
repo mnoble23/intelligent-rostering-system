@@ -8,6 +8,8 @@ interface User {
   role: "manager" | "staff";
   min_hours: number;
   max_hours: number;
+  min_shifts_per_week: number;
+  max_shifts_per_week: number;
 }
 
 interface Availability {
@@ -205,6 +207,8 @@ export default function MyProfile({ weekStartDate }: MyProfileProps) {
                 <span className="my-profile__chip">Role: <strong>{selectedUser?.role ?? "staff"}</strong></span>
                 <span className="my-profile__chip">Min Weekly Hours: <strong>{selectedUser?.min_hours ?? 0}</strong></span>
                 <span className="my-profile__chip">Max Weekly Hours: <strong>{selectedUser?.max_hours ?? 40}</strong></span>
+                <span className="my-profile__chip">Min Weekly Shifts: <strong>{selectedUser?.min_shifts_per_week ?? 1}</strong></span>
+                <span className="my-profile__chip">Max Weekly Shifts: <strong>{selectedUser?.max_shifts_per_week ?? 7}</strong></span>
                 <span className="my-profile__chip">Weekly Availability Hours: <strong>{availabilityHours.toFixed(1)}</strong></span>
               </div>
             </section>

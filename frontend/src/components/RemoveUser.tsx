@@ -8,6 +8,8 @@ interface User {
   role: "manager" | "staff";
   min_hours: number;
   max_hours: number;
+  min_shifts_per_week: number;
+  max_shifts_per_week: number;
 }
 
 interface RemoveUserProps {
@@ -126,7 +128,7 @@ export default function RemoveUser({ refreshRoster }: RemoveUserProps) {
           {selectedUser && (
             <p className="remove-user__summary">
               Selected: <strong>{selectedUser.name}</strong> ({selectedUser.role}) | Hours:{" "}
-              {selectedUser.min_hours} - {selectedUser.max_hours}
+              {selectedUser.min_hours} - {selectedUser.max_hours} | Shifts: {selectedUser.min_shifts_per_week} - {selectedUser.max_shifts_per_week}
             </p>
           )}
 
