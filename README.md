@@ -1,21 +1,22 @@
 # intelligent-rostering-system
-Full-stack web application for generating optimised staff rosters based on availability and constraints using Python, PostgreSQL, and React.
+Full-stack web application for generating optimized staff rosters based on availability and workplace constraints using Python, PostgreSQL, and React.
 
 ## Tech Stack
-- **Backend:** Python, FastAPI 
-- **Frontend:** React
-- **Database:** PostgreSQL 
-- **Authentication:** JWT 
-- **Deployment:** Docker (local docker-compose setup available)
+- **Backend:** Python, FastAPI
+- **Frontend:** React + TypeScript
+- **Database:** PostgreSQL
+- **Authentication:** JWT bearer tokens
+- **Deployment:** Docker (local `docker-compose` supported)
 
 ## Project Overview
-This system will allow staff to submit their availability and will generate rosters based on these availabilities and some other constraints to optimise the rosters.
-Key features include:
-- User availability submission
-- Manual shift management
-- Automatic roster generation
-- Scheduling logic based on additional constraints
-- Web-based dashboard for roster visualisation
+This system allows workplaces to:
+- Create an initial manager account with first-run onboarding
+- Add and manage staff users
+- Submit weekly availability
+- Generate rosters for one or more weeks
+- Manually adjust assignments
+- View shift coverage and understaffed time slots
+- Configure workplace-level staffing constraints
 
 ## Project Status
 Work in progress.
@@ -29,24 +30,23 @@ Work in progress.
 - Staff: `demo_staff_1` / `Staff123!`
 
 ### Demo Notes
-- Frontend may take a while to load initially due to using free tier hosting services but a refresh after 30-60 seconds should work.
+- Frontend may take 30-60 seconds to wake up on first load due to free-tier hosting.
 - Demo data resets nightly at 05:00 Irish Time.
-- If demo credentials stop working, wait for the next scheduled reset or trigger `/admin/reset-demo` manually.
+- `/admin/reset-demo` is protected and only works when the backend runs with `APP_ENV=demo`, a configured `DEMO_RESET_KEY`, and an `X-Reset-Key` request header.
 
 ### Quick Test Flow
-1. Sign in as `demo_manager`
-2. Open **Roster Dashboard**
-3. Go to **Generate Roster** and generate for the selected week
-4. Open **Manage Shifts** and make one assignment change
-5. Sign out and verify staff view with `demo_staff_1`
+1. Sign in as `demo_manager`.
+2. Open **Roster Dashboard**.
+3. Go to **Generate Roster** and generate for the selected week.
+4. Open **Manage Shifts** and make one assignment change.
+5. Sign out and verify the staff view with `demo_staff_1`.
 
 ## How To Run
-
 Choose one of the two options below.
 
 ### 1. Clone Repo
 ```bash
-git clone https://github.com/mnoble23/intelligent-rostering-syst
+git clone https://github.com/mnoble23/intelligent-rostering-system
 cd intelligent-rostering-system
 ```
 
@@ -55,10 +55,10 @@ cd intelligent-rostering-system
 docker compose up --build
 ```
 
-Frontend runs at: `http://localhost:3000`  
-Backend runs at: `http://127.0.0.1:8000`
+Frontend: `http://localhost:3000`  
+Backend: `http://127.0.0.1:8000`
 
-To reset local docker data:
+To fully reset local Docker data:
 ```bash
 docker compose down -v
 docker compose up --build
@@ -66,112 +66,106 @@ docker compose up --build
 
 ### Option B: Run manually (without Docker)
 
-#### 1. Configure Backend with Database
-Create a `.env` file inside `backend/` and add your database connection string:
+#### 1. Configure backend env
+Create `backend/.env`:
 
 ```env
 DATABASE_URL=postgresql+psycopg2://<username>:<password>@<host>:<port>/<database_name>
+JWT_SECRET_KEY=change-me-in-production
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+DEFAULT_USER_PASSWORD=ChangeMe123!
 ```
 
-#### 2. Backend Setup (FastAPI)
-```bash
+Optional demo-only variables:
+
+```env
+APP_ENV=demo
+DEMO_RESET_KEY=<secret-value>
+DEMO_WORKPLACE_NAME=Demo Company
+DEMO_MANAGER_PASSWORD=Manager123!
+DEMO_STAFF_PASSWORD=Staff123!
+```
+
+#### 2. Start backend (FastAPI)
+```powershell
 cd backend
 python -m venv .venv
-source .venv/Scripts/activate 
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Backend runs at: `http://127.0.0.1:8000`
+Backend: `http://127.0.0.1:8000`
 
-#### 3. Start the Frontend (React)
+#### 3. Start frontend (React)
 In a second terminal:
+
 ```bash
 cd frontend
 npm install
 npm start
 ```
 
-Frontend runs at: `http://localhost:3000`
+Frontend: `http://localhost:3000`
 
 ### Use the app
-- Open `http://localhost:3000`
-- Create a new workplace or sign in if already created
-- Submit user availability
-- Generate a roster from the UI
-- View roster 
+- Open `http://localhost:3000`.
+- If no users exist yet, run onboarding to create the first workplace + manager.
+- Add staff users and their availability.
+- Generate a roster from the UI.
+- Review coverage and optionally adjust assignments manually.
 
 ### Troubleshooting (Docker)
-- If you want a full clean reset of local Docker data:
-```bash
-docker compose down -v
-docker compose up --build
-```
-- If ports `3000`, `8000`, or `5432` are already in use, stop the conflicting local app/container and rerun:
+- If ports `3000`, `8000`, or `5432` are already in use, stop conflicting processes/containers and rerun:
+
 ```bash
 docker compose up --build
 ```
 
 ## Currently Implemented
-- FastAPI backend initialised
-- Modular backend folder structure
-- Availability validation checks
-- Endpoints to post availability entries (single and multiple)
-- Implemented initial roster generation logic (very basic so far)
-- Database now fully integrated
-- Connected React frontend with backend
-- Added features to React app so that a user can submit availability, generate rosters, manually manage shifts and more
-- Simplistic but nice react app design for easy navigation and use
-- Rosters can be generated for multiple weeks
+- JWT login (`/auth/login`) and current-user endpoint (`/auth/me`)
+- First-run onboarding flow (`/onboarding/status`, `/onboarding/create-workplace`)
+- Role-based access (`manager`/`staff`) with protected routes
+- Workplace isolation across users, availability, shifts, and assignments
+- User CRUD (manager-controlled) with min/max hours and min/max shifts per week
+- Availability submission (single and bulk) with overlap validation
+- Weekly roster generation for up to 52 weeks in one request
+- Manual assignment and unassignment endpoints
+- Shift coverage endpoint for understaffing visibility
+- Workplace constraints endpoints for staffing rules
+- React frontend pages for dashboard, roster generation, assignment management, profile, and coverage
+- Dockerized local stack for frontend, backend, and PostgreSQL
+- Backend tests for route security and workplace isolation
 
 ## Next Steps
-- Add DB-level uniqueness/index constraints for tenant safety and performance
-- Add more cross-workplace regression tests around manager edge cases
-- Small improvements needed to make things like submitting availability less tedious
-- Subheadings for each page to separate things like roster generation and deletion from things like viewing 'My Profile' and 'My Roster' pages
+- Add DB-level uniqueness/index constraints for stronger tenant safety and performance
+- Expand automated test coverage for scheduling edge cases and multi-week generation behavior
+- Improve UX for availability entry (faster editing, fewer repetitive inputs)
+- Add richer scheduler failure explanations when constraints cannot be satisfied
+- Continue evolving fairness objectives (weekends/nights/load balancing)
 
-## Roster Generation Info
-**Current Version**
-- Creates a weekly roster adhering to user availability
-- No overlapping shifts for a user and only one shift per day
-- Ensures a minimum 2 staff working at a time with at least 1 manager at any time
-- Shifts can be 4, 6 or 9 hours long
-- Business hours from 06:00 - 22:00
-
-**Future Upgrades:**
-- Maximum working days in a row
-- Include a minimum rest period between shifts
-- Add unit tests to ensure the roster is not violating any of the constraints
-
-## Frontend Info and Plans
-**Currently Implemented:** 
-- Roster dashboard table to view full roster for the week
-- Page for user submission of their name, availability, min and max hours, role
-- Generate Roster button
-- My Roster page to show a user their roster for the week
-- Shift coverage page to see what times are understaffed
-- Login + JWT auth with role-based access (manager/staff)
-- First-run workplace onboarding flow for initial manager creation
-- My profile page added for a user to look at their info such as submitted availability and assigned shifts and min and max hours per week
-- React app has been updated with much nicer design and easier to navigate
-- Manual shift management page can be used to manage shifts by selecting the employee and day to edit it
-
-**Planned Improvements:**
-- Small improvements needed to make things like submitting availability less tedious
-- Subheadings for each page to separate things like roster generation and deletion from things like viewing 'My Profile' and 'My Roster' pages
+## Roster Generation and Constraints
+Current scheduler behavior:
+- Generates weekly shifts within business hours (`06:00`-`22:00`)
+- Builds assignable shifts from submitted availability
+- Applies workplace-level constraints:
+  - `min_staff_per_shift`
+  - `min_managers_per_hour`
+  - `max_consecutive_shifts`
+  - `min_hours_between_shifts`
+- Respects user-level limits:
+  - `min_hours` / `max_hours`
+  - `min_shifts_per_week` / `max_shifts_per_week`
 
 ## Potential Future Upgrades
-- Allow for specific business operation times to be picked
-- Allow minimum and maximum number of staff per shift to be picked (with specific choices for given times on given days)
-- Scheduling breaks for each member of staff
-- Specific shift lengths for a business could be input rather than just the 4, 6 or 9 hour blocks
-- Allow for holidays to be put in so a user will not be included for that time period
-- Better fairness objective with night/weekends/unpopular shifts/number of extra hours
-- Skill based coverage
-- Let users rank preferred times
-- When roster generation fails, return exact reasons it has failed
-- A lot of these changes may require a change in roster generation approach, it is currently using a greedy heuristics type of model but may need to be changed to a constraint programming type of model with scoring and penalties
-- Shift swap feature
+- Configurable business operating hours from the UI
+- Shift-length customization by workplace
+- Shift swap workflows
+- Break scheduling
+- Holidays/time-off integration
+- Skill-based coverage rules
+- Preference-aware optimization
+- Constraint-programming style optimization for better global fairness
 
 ## License
 This project is licensed under the MIT License.
