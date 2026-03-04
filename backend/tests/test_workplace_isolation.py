@@ -253,15 +253,24 @@ def test_workplace_constraints_can_be_read_and_updated_by_manager():
     assert get_response.status_code == 200
     assert get_response.json()["min_staff_per_shift"] == 2
     assert get_response.json()["min_managers_per_hour"] == 1
+    assert get_response.json()["max_consecutive_shifts"] == 5
+    assert get_response.json()["min_hours_between_shifts"] == 11
 
     put_response = client.put(
         "/workplace/constraints",
         headers={"Authorization": f"Bearer {manager_a_token}"},
-        json={"min_staff_per_shift": 3, "min_managers_per_hour": 1},
+        json={
+            "min_staff_per_shift": 3,
+            "min_managers_per_hour": 1,
+            "max_consecutive_shifts": 4,
+            "min_hours_between_shifts": 12,
+        },
     )
     assert put_response.status_code == 200
     assert put_response.json()["min_staff_per_shift"] == 3
     assert put_response.json()["min_managers_per_hour"] == 1
+    assert put_response.json()["max_consecutive_shifts"] == 4
+    assert put_response.json()["min_hours_between_shifts"] == 12
 
 
 def test_workplace_constraints_reject_invalid_manager_requirements():
@@ -274,7 +283,12 @@ def test_workplace_constraints_reject_invalid_manager_requirements():
     bad_update = client.put(
         "/workplace/constraints",
         headers={"Authorization": f"Bearer {manager_a_token}"},
-        json={"min_staff_per_shift": 1, "min_managers_per_hour": 2},
+        json={
+            "min_staff_per_shift": 1,
+            "min_managers_per_hour": 2,
+            "max_consecutive_shifts": 5,
+            "min_hours_between_shifts": 11,
+        },
     )
     assert bad_update.status_code == 400
     assert bad_update.json()["detail"] == "min_managers_per_hour cannot exceed min_staff_per_shift"
