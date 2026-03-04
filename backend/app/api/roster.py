@@ -144,6 +144,10 @@ def debug_assigned_shifts(
         user.id: (float(user.min_hours), float(user.max_hours))
         for user in users
     }
+    user_shift_limits = {
+        user.id: (int(user.min_shifts_per_week), int(user.max_shifts_per_week))
+        for user in users
+    }
     user_roles = {
         user.id: user.role
         for user in users
@@ -155,6 +159,7 @@ def debug_assigned_shifts(
         workplace_id=current_user.workplace_id,
         min_staff_per_shift=min_staff_per_shift,
         user_hour_limits=user_hour_limits,
+        user_shift_limits=user_shift_limits,
         user_roles=user_roles,
         min_managers_per_hour=min_managers_per_hour,
         max_consecutive_shifts=max_consecutive_shifts,
@@ -192,6 +197,10 @@ def generate_roster(
         user.id: (float(user.min_hours), float(user.max_hours))
         for user in users
     }
+    user_shift_limits = {
+        user.id: (int(user.min_shifts_per_week), int(user.max_shifts_per_week))
+        for user in users
+    }
     user_roles = {
         user.id: user.role
         for user in users
@@ -213,6 +222,7 @@ def generate_roster(
                 workplace_id=current_user.workplace_id,
                 min_staff_per_shift=min_staff_per_shift,
                 user_hour_limits=user_hour_limits,
+                user_shift_limits=user_shift_limits,
                 user_roles=user_roles,
                 min_managers_per_hour=min_managers_per_hour,
                 max_consecutive_shifts=max_consecutive_shifts,
