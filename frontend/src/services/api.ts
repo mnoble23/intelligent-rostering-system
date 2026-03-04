@@ -6,6 +6,24 @@ type AuthErrorHandlers = {
   onForbidden?: () => void;
 };
 
+type ApiErrorObjectDetail = {
+  message?: unknown;
+  explanation?: unknown;
+  suggestions?: unknown;
+  context?: unknown;
+};
+
+type ValidationErrorItem = {
+  loc?: unknown;
+  msg?: unknown;
+};
+
+type FormatApiErrorOptions = {
+  fallbackMessage: string;
+  detailMap?: Record<string, string>;
+  statusMap?: Record<number, string>;
+};
+
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8000";
 
 const API = axios.create({
@@ -29,6 +47,104 @@ export function loadStoredAuthToken() {
 
 export function setAuthErrorHandlers(handlers: AuthErrorHandlers) {
   authErrorHandlers = handlers;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function formatValidationErrors(detail: unknown) {
+  if (!Array.isArray(detail)) return null;
+  const parts = detail
+    .map(item => {
+      const entry = item as ValidationErrorItem;
+      const msg = typeof entry.msg === "string" ? entry.msg : "";
+      if (!msg) return "";
+      const location = Array.isArray(entry.loc)
+        ? entry.loc.filter(part => typeof part === "string" || typeof part === "number").join(".")
+        : "";
+      return location ? `${location}: ${msg}` : msg;
+    })
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
+function formatObjectDetail(detail: unknown) {
+  if (!isRecord(detail)) return null;
+  const payload = detail as ApiErrorObjectDetail;
+  const parts: string[] = [];
+
+  if (typeof payload.message === "string") {
+    parts.push(payload.message);
+  }
+  if (typeof payload.explanation === "string") {
+    parts.push(payload.explanation);
+  }
+
+  if (isRecord(payload.context)) {
+    const dayLabel = typeof payload.context.day_label === "string" ? payload.context.day_label : undefined;
+    const hourLabel = typeof payload.context.hour_label === "string" ? payload.context.hour_label : undefined;
+    if (dayLabel && hourLabel) {
+      parts.push(`First uncovered time: ${dayLabel} at ${hourLabel}.`);
+    }
+
+    if (
+      typeof payload.context.assigned_staff === "number"
+      && typeof payload.context.required_staff === "number"
+    ) {
+      parts.push(`Assigned staff: ${payload.context.assigned_staff}, required: ${payload.context.required_staff}.`);
+    }
+
+    if (typeof payload.context.required_managers_per_hour === "number") {
+      parts.push(`Required managers per hour: ${payload.context.required_managers_per_hour}.`);
+    }
+
+    if (
+      typeof payload.context.user_id === "number"
+      && typeof payload.context.assigned_shifts === "number"
+      && typeof payload.context.required_shifts === "number"
+    ) {
+      parts.push(`User ${payload.context.user_id} shifts: ${payload.context.assigned_shifts}/${payload.context.required_shifts}.`);
+    }
+  }
+
+  if (Array.isArray(payload.suggestions)) {
+    const suggestions = payload.suggestions.filter(item => typeof item === "string") as string[];
+    if (suggestions.length > 0) {
+      parts.push(`Try: ${suggestions.slice(0, 2).join(" ")}`);
+    }
+  }
+
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
+export function formatApiError(error: unknown, options: FormatApiErrorOptions) {
+  const detail = (error as any)?.response?.data?.detail;
+  const status = (error as any)?.response?.status as number | undefined;
+
+  if (typeof detail === "string") {
+    return options.detailMap?.[detail] ?? detail;
+  }
+
+  const structuredMessage = formatObjectDetail(detail);
+  if (structuredMessage) {
+    return structuredMessage;
+  }
+
+  const validationMessage = formatValidationErrors(detail);
+  if (validationMessage) {
+    return validationMessage;
+  }
+
+  if (typeof status === "number" && options.statusMap?.[status]) {
+    return options.statusMap[status];
+  }
+
+  if ((error as any)?.request && !(error as any)?.response) {
+    return "Could not reach the server. Check your connection and try again.";
+  }
+
+  return options.fallbackMessage;
 }
 
 API.interceptors.response.use(
