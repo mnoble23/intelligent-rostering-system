@@ -6,6 +6,8 @@ interface WorkplaceConstraintsResponse {
   workplace_id: number;
   min_staff_per_shift: number;
   min_managers_per_hour: number;
+  max_consecutive_shifts: number;
+  min_hours_between_shifts: number;
 }
 
 export default function WorkplaceConstraints() {
@@ -42,7 +44,10 @@ export default function WorkplaceConstraints() {
     };
   }, []);
 
-  const updateConstraint = (field: "min_staff_per_shift" | "min_managers_per_hour", value: number) => {
+  const updateConstraint = (
+    field: "min_staff_per_shift" | "min_managers_per_hour" | "max_consecutive_shifts" | "min_hours_between_shifts",
+    value: number
+  ) => {
     setConstraints(current => {
       if (!current) return current;
       return { ...current, [field]: value };
@@ -58,6 +63,8 @@ export default function WorkplaceConstraints() {
       const response = await API.put<WorkplaceConstraintsResponse>("/workplace/constraints", {
         min_staff_per_shift: constraints.min_staff_per_shift,
         min_managers_per_hour: constraints.min_managers_per_hour,
+        max_consecutive_shifts: constraints.max_consecutive_shifts,
+        min_hours_between_shifts: constraints.min_hours_between_shifts,
       });
       setConstraints(response.data);
       setStatus("Constraints saved.");
@@ -100,6 +107,30 @@ export default function WorkplaceConstraints() {
               max={10}
               value={constraints?.min_managers_per_hour ?? 1}
               onChange={event => updateConstraint("min_managers_per_hour", Number(event.target.value))}
+              disabled={!constraints || statusType === "loading"}
+            />
+          </label>
+
+          <label className="workplace-constraints__field">
+            <span>Max consecutive shifts</span>
+            <input
+              type="number"
+              min={1}
+              max={7}
+              value={constraints?.max_consecutive_shifts ?? 5}
+              onChange={event => updateConstraint("max_consecutive_shifts", Number(event.target.value))}
+              disabled={!constraints || statusType === "loading"}
+            />
+          </label>
+
+          <label className="workplace-constraints__field">
+            <span>Min hours between shifts</span>
+            <input
+              type="number"
+              min={0}
+              max={24}
+              value={constraints?.min_hours_between_shifts ?? 11}
+              onChange={event => updateConstraint("min_hours_between_shifts", Number(event.target.value))}
               disabled={!constraints || statusType === "loading"}
             />
           </label>
