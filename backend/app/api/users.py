@@ -31,6 +31,8 @@ def get_users(
                 "role": current_user.role,
                 "min_hours": current_user.min_hours,
                 "max_hours": current_user.max_hours,
+                "min_shifts_per_week": current_user.min_shifts_per_week,
+                "max_shifts_per_week": current_user.max_shifts_per_week,
                 "is_active": current_user.is_active,
             }
         ]
@@ -43,6 +45,8 @@ def get_users(
             "role": user.role,
             "min_hours": user.min_hours,
             "max_hours": user.max_hours,
+            "min_shifts_per_week": user.min_shifts_per_week,
+            "max_shifts_per_week": user.max_shifts_per_week,
             "is_active": user.is_active,
         }
         for user in users
@@ -66,6 +70,11 @@ def create_user(
         raise HTTPException(status_code=400, detail="role must be 'manager' or 'staff'")
     if user.max_hours < user.min_hours:
         raise HTTPException(status_code=400, detail="max_hours must be greater than or equal to min_hours")
+    if user.max_shifts_per_week < user.min_shifts_per_week:
+        raise HTTPException(
+            status_code=400,
+            detail="max_shifts_per_week must be greater than or equal to min_shifts_per_week",
+        )
     if raw_password and len(raw_password) < 8:
         raise HTTPException(status_code=400, detail="password must be at least 8 characters")
 
@@ -81,6 +90,8 @@ def create_user(
         existing_user.role = normalized_role
         existing_user.min_hours = user.min_hours
         existing_user.max_hours = user.max_hours
+        existing_user.min_shifts_per_week = user.min_shifts_per_week
+        existing_user.max_shifts_per_week = user.max_shifts_per_week
         existing_user.is_active = True
         if raw_password:
             existing_user.password_hash = hash_password(raw_password)
@@ -94,6 +105,8 @@ def create_user(
         role=normalized_role,
         min_hours=user.min_hours,
         max_hours=user.max_hours,
+        min_shifts_per_week=user.min_shifts_per_week,
+        max_shifts_per_week=user.max_shifts_per_week,
         password_hash=hash_password(password_to_store),
         is_active=True,
         workplace_id=current_user.workplace_id,
