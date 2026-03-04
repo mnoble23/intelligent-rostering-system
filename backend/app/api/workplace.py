@@ -17,11 +17,15 @@ class WorkplaceConstraintsResponse(BaseModel):
     workplace_id: int
     min_staff_per_shift: int = Field(ge=1, le=20)
     min_managers_per_hour: int = Field(ge=0, le=10)
+    max_consecutive_shifts: int = Field(ge=1, le=7)
+    min_hours_between_shifts: int = Field(ge=0, le=24)
 
 
 class UpdateWorkplaceConstraintsRequest(BaseModel):
     min_staff_per_shift: int = Field(ge=1, le=20)
     min_managers_per_hour: int = Field(ge=0, le=10)
+    max_consecutive_shifts: int = Field(ge=1, le=7)
+    min_hours_between_shifts: int = Field(ge=0, le=24)
 
 
 @router.get("/constraints", response_model=WorkplaceConstraintsResponse)
@@ -37,6 +41,8 @@ def get_workplace_constraints(
         "workplace_id": workplace.id,
         "min_staff_per_shift": workplace.min_staff_per_shift,
         "min_managers_per_hour": workplace.min_managers_per_hour,
+        "max_consecutive_shifts": workplace.max_consecutive_shifts,
+        "min_hours_between_shifts": workplace.min_hours_between_shifts,
     }
 
 
@@ -58,6 +64,8 @@ def update_workplace_constraints(
 
     workplace.min_staff_per_shift = payload.min_staff_per_shift
     workplace.min_managers_per_hour = payload.min_managers_per_hour
+    workplace.max_consecutive_shifts = payload.max_consecutive_shifts
+    workplace.min_hours_between_shifts = payload.min_hours_between_shifts
     db.commit()
     db.refresh(workplace)
 
@@ -65,4 +73,6 @@ def update_workplace_constraints(
         "workplace_id": workplace.id,
         "min_staff_per_shift": workplace.min_staff_per_shift,
         "min_managers_per_hour": workplace.min_managers_per_hour,
+        "max_consecutive_shifts": workplace.max_consecutive_shifts,
+        "min_hours_between_shifts": workplace.min_hours_between_shifts,
     }
