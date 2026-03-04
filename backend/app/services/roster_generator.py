@@ -22,6 +22,24 @@ MIN_HOURS_BETWEEN_SHIFTS = 11
 MANAGER_ROLE = "manager"
 
 
+class RosterGenerationError(ValueError):
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        explanation: str,
+        suggestions: List[str] | None = None,
+        context: Dict[str, int | float | str] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.explanation = explanation
+        self.suggestions = suggestions or []
+        self.context = context or {}
+
+
 @dataclass
 class Shift:
     week_start_date: date
@@ -474,9 +492,22 @@ def assign_staff_to_shifts(
                 uncovered_manager_hours.append((day, hour))
     if uncovered_manager_hours:
         first_uncovered_day, first_uncovered_hour = uncovered_manager_hours[0]
-        raise ValueError(
-            f"Unable to generate roster with manager coverage. "
-            f"First uncovered slot: day={first_uncovered_day}, hour={first_uncovered_hour:02d}:00."
+        raise RosterGenerationError(
+            code="manager_coverage_unmet",
+            message="Roster generation failed: manager coverage target could not be met.",
+            explanation=(
+                "At least one open hour has fewer managers assigned than required."
+            ),
+            suggestions=[
+                "Increase manager availability for the uncovered period.",
+                "Lower the minimum managers per hour setting if operationally safe.",
+                "Relax rest-gap or consecutive-shift rules if they are too restrictive.",
+            ],
+            context={
+                "day_of_week": first_uncovered_day,
+                "hour": first_uncovered_hour,
+                "required_managers_per_hour": min_managers_per_hour,
+            },
         )
 
     uncovered_staff_hours: List[Tuple[int, int]] = []
@@ -487,11 +518,23 @@ def assign_staff_to_shifts(
     if uncovered_staff_hours:
         first_uncovered_day, first_uncovered_hour = uncovered_staff_hours[0]
         assigned_count = hourly_assigned_staff_by_day[first_uncovered_day][first_uncovered_hour]
-        raise ValueError(
-            f"Unable to generate roster with minimum staff coverage. "
-            f"First uncovered slot: day={first_uncovered_day}, "
-            f"hour={first_uncovered_hour:02d}:00, "
-            f"assigned={assigned_count}, required={min_staff_per_shift}."
+        raise RosterGenerationError(
+            code="staff_coverage_unmet",
+            message="Roster generation failed: minimum staff coverage could not be met.",
+            explanation=(
+                "At least one open hour has fewer assigned team members than required."
+            ),
+            suggestions=[
+                "Collect more availability for the uncovered period.",
+                "Reduce minimum staff per shift if service levels allow.",
+                "Review max-hours and max-shifts limits for key users.",
+            ],
+            context={
+                "day_of_week": first_uncovered_day,
+                "hour": first_uncovered_hour,
+                "assigned_staff": assigned_count,
+                "required_staff": min_staff_per_shift,
+            },
         )
 
     users_below_min_shifts = [
@@ -505,9 +548,22 @@ def assign_staff_to_shifts(
     ]
     if users_below_min_shifts:
         user_id, assigned_shifts, required_shifts = users_below_min_shifts[0]
-        raise ValueError(
-            f"Unable to generate roster with minimum shifts per week. "
-            f"User {user_id} assigned={assigned_shifts}, required={required_shifts}."
+        raise RosterGenerationError(
+            code="min_shifts_unmet",
+            message="Roster generation failed: one or more users did not reach minimum weekly shifts.",
+            explanation=(
+                "The scheduler could not satisfy minimum weekly shift targets while respecting all constraints."
+            ),
+            suggestions=[
+                "Lower minimum shifts for affected users.",
+                "Increase those users' availability windows.",
+                "Relax constraints such as rest gaps or consecutive-shift limits.",
+            ],
+            context={
+                "user_id": user_id,
+                "assigned_shifts": assigned_shifts,
+                "required_shifts": required_shifts,
+            },
         )
 
     existing_shift_ids = [
