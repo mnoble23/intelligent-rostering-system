@@ -16,6 +16,7 @@ from app.services.availability_loader import load_weekly_availability
 from app.services.roster_generator import (
     BUSINESS_END,
     BUSINESS_START,
+    RosterGenerationError,
     assign_staff_to_shifts,
     generate_weekly_shifts,
     match_availability_to_shifts,
@@ -26,6 +27,38 @@ router = APIRouter(
     tags=["Roster"],
     dependencies=[Depends(get_current_user)],
 )
+
+
+DAY_LABELS = (
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+)
+
+
+def format_roster_generation_error(exc: ValueError) -> str | Dict:
+    if not isinstance(exc, RosterGenerationError):
+        return "Roster generation failed. Check staffing constraints and availability, then try again."
+
+    context = dict(exc.context)
+    day_of_week = context.get("day_of_week")
+    hour = context.get("hour")
+    if isinstance(day_of_week, int) and 0 <= day_of_week <= 6:
+        context["day_label"] = DAY_LABELS[day_of_week]
+    if isinstance(hour, int):
+        context["hour_label"] = f"{hour:02d}:00"
+
+    return {
+        "code": exc.code,
+        "message": exc.message,
+        "explanation": exc.explanation,
+        "suggestions": exc.suggestions,
+        "context": context,
+    }
 
 
 class ManualAssignmentUpdate(BaseModel):
@@ -229,7 +262,7 @@ def generate_roster(
                 min_hours_between_shifts=min_hours_between_shifts,
             )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=format_roster_generation_error(exc)) from exc
 
     return {
         "status": "roster generated",
