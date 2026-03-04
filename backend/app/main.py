@@ -96,6 +96,36 @@ with engine.begin() as connection:
         connection.execute(
             text('ALTER TABLE "workplace" ALTER COLUMN min_managers_per_hour SET NOT NULL')
         )
+    if "max_consecutive_shifts" not in workplace_columns:
+        connection.execute(
+            text('ALTER TABLE "workplace" ADD COLUMN max_consecutive_shifts INTEGER')
+        )
+        connection.execute(
+            text('UPDATE "workplace" SET max_consecutive_shifts = 5 WHERE max_consecutive_shifts IS NULL')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN max_consecutive_shifts SET DEFAULT 5')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN max_consecutive_shifts SET NOT NULL')
+        )
+    if "min_hours_between_shifts" not in workplace_columns:
+        connection.execute(
+            text('ALTER TABLE "workplace" ADD COLUMN min_hours_between_shifts INTEGER')
+        )
+        connection.execute(
+            text('UPDATE "workplace" SET min_hours_between_shifts = 11 WHERE min_hours_between_shifts IS NULL')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN min_hours_between_shifts SET DEFAULT 11')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN min_hours_between_shifts SET NOT NULL')
+        )
+    if "min_hours_between_shifts" in workplace_columns:
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN min_hours_between_shifts SET DEFAULT 11')
+        )
 
     default_workplace_row = connection.execute(
         text('SELECT id FROM workplace ORDER BY id LIMIT 1')
