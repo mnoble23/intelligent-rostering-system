@@ -172,6 +172,9 @@ def assign_staff_to_shifts(
     def would_exceed_max_consecutive_shifts(user_id: int, candidate_day: int) -> bool:
         assigned_days = set(user_daily_assignments.get(user_id, {}).keys())
         assigned_days.add(candidate_day)
+        return projected_consecutive_run(user_id, candidate_day) > max_consecutive_shifts
+
+    def _max_consecutive_run(assigned_days: set[int]) -> int:
         max_run = 0
         current_run = 0
         for day in range(7):
@@ -180,7 +183,12 @@ def assign_staff_to_shifts(
                 max_run = max(max_run, current_run)
             else:
                 current_run = 0
-        return max_run > max_consecutive_shifts
+        return max_run
+
+    def projected_consecutive_run(user_id: int, candidate_day: int) -> int:
+        assigned_days = set(user_daily_assignments.get(user_id, {}).keys())
+        assigned_days.add(candidate_day)
+        return _max_consecutive_run(assigned_days)
 
     def has_minimum_rest_gap(user_id: int, candidate_shift: Shift) -> bool:
         candidate_start, candidate_end = shift_datetimes(candidate_shift)
@@ -245,7 +253,7 @@ def assign_staff_to_shifts(
                 hourly_assigned_managers_by_day[day][hour] += 1
 
     while True:
-        best_manager_assignment: Tuple[int, int, float, int] | None = None
+        best_manager_assignment: Tuple[int, int, float, int, int] | None = None
 
         for day, ordered_shifts in ordered_shifts_by_day.items():
             hourly_assigned_managers = hourly_assigned_managers_by_day[day]
@@ -260,6 +268,8 @@ def assign_staff_to_shifts(
                 sorted_manager_candidates = sorted(
                     manager_candidates,
                     key=lambda user_id: (
+                        projected_consecutive_run(user_id, day),
+                        user_assigned_shift_counts.get(user_id, 0),
                         -max(
                             0.0,
                             user_hour_limits.get(user_id, (0.0, float("inf")))[0]
@@ -296,6 +306,26 @@ def assign_staff_to_shifts(
                         or (
                             manager_coverage_gain == best_manager_assignment[3]
                             and duration_hours == best_manager_assignment[2]
+                            and projected_consecutive_run(user_id, day)
+                            < projected_consecutive_run(
+                                best_manager_assignment[1],
+                                best_manager_assignment[4],
+                            )
+                        )
+                        or (
+                            manager_coverage_gain == best_manager_assignment[3]
+                            and duration_hours == best_manager_assignment[2]
+                            and projected_consecutive_run(user_id, day)
+                            == projected_consecutive_run(
+                                best_manager_assignment[1],
+                                best_manager_assignment[4],
+                            )
+                            and user_assigned_shift_counts.get(user_id, 0)
+                            < user_assigned_shift_counts.get(best_manager_assignment[1], 0)
+                        )
+                        or (
+                            manager_coverage_gain == best_manager_assignment[3]
+                            and duration_hours == best_manager_assignment[2]
                             and user_assigned_hours.get(user_id, 0.0)
                             < user_assigned_hours.get(best_manager_assignment[1], 0.0)
                         )
@@ -305,16 +335,17 @@ def assign_staff_to_shifts(
                             user_id,
                             duration_hours,
                             manager_coverage_gain,
+                            day,
                         )
 
         if best_manager_assignment is None:
             break
 
-        shift_id, user_id, _, _ = best_manager_assignment
+        shift_id, user_id, _, _, _ = best_manager_assignment
         apply_assignment(user_id, shift_id)
 
     while True:
-        best_assignment: Tuple[int, int, float, int] | None = None
+        best_assignment: Tuple[int, int, float, int, int] | None = None
 
         for day, ordered_shifts in ordered_shifts_by_day.items():
             hourly_assigned_staff = hourly_assigned_staff_by_day[day]
@@ -324,6 +355,8 @@ def assign_staff_to_shifts(
                 sorted_candidates = sorted(
                     available_candidates_by_shift[shift_id],
                     key=lambda user_id: (
+                        projected_consecutive_run(user_id, day),
+                        user_assigned_shift_counts.get(user_id, 0),
                         -max(
                             0.0,
                             user_hour_limits.get(user_id, (0.0, float("inf")))[0]
@@ -360,16 +393,30 @@ def assign_staff_to_shifts(
                         or (
                             coverage_gain == best_assignment[3]
                             and duration_hours == best_assignment[2]
+                            and projected_consecutive_run(user_id, day)
+                            < projected_consecutive_run(best_assignment[1], best_assignment[4])
+                        )
+                        or (
+                            coverage_gain == best_assignment[3]
+                            and duration_hours == best_assignment[2]
+                            and projected_consecutive_run(user_id, day)
+                            == projected_consecutive_run(best_assignment[1], best_assignment[4])
+                            and user_assigned_shift_counts.get(user_id, 0)
+                            < user_assigned_shift_counts.get(best_assignment[1], 0)
+                        )
+                        or (
+                            coverage_gain == best_assignment[3]
+                            and duration_hours == best_assignment[2]
                             and user_assigned_hours.get(user_id, 0.0)
                             < user_assigned_hours.get(best_assignment[1], 0.0)
                         )
                     ):
-                        best_assignment = (shift_id, user_id, duration_hours, coverage_gain)
+                        best_assignment = (shift_id, user_id, duration_hours, coverage_gain, day)
 
         if best_assignment is None:
             break
 
-        shift_id, user_id, _, _ = best_assignment
+        shift_id, user_id, _, _, _ = best_assignment
         apply_assignment(user_id, shift_id)
 
     while True:
