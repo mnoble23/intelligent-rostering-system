@@ -129,6 +129,51 @@
   gap: 6px;
 }
 
+.availability-form__user-picker {
+  position: relative;
+}
+
+.availability-form__user-menu {
+  background: #fff;
+  border: 1px solid #c8d7e5;
+  border-radius: 10px;
+  box-shadow: 0 12px 24px rgba(12, 34, 53, 0.14);
+  left: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+}
+
+.availability-form__user-item {
+  background: #fff;
+  border: 0;
+  color: #1f3447;
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  padding: 8px 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.availability-form__user-item:hover {
+  background: #f3f8fd;
+}
+
+.availability-form__user-item--active {
+  background: #e9f3fc;
+  color: #0b4b79;
+  font-weight: 700;
+}
+
+.availability-form__user-item--empty {
+  color: #5f7286;
+  cursor: default;
+}
+
 .availability-form__field span {
   color: #3c5065;
   font-size: 0.83rem;

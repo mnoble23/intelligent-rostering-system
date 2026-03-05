@@ -60,6 +60,8 @@ export default function UserAvailabilityForm() {
   const [managerMode, setManagerMode] = useState<ManagerMode | null>(null);
   const [managerUsers, setManagerUsers] = useState<ManagerUser[]>([]);
   const [selectedExistingUserId, setSelectedExistingUserId] = useState<number | "">("");
+  const [existingUserSearch, setExistingUserSearch] = useState("");
+  const [isExistingUserMenuOpen, setIsExistingUserMenuOpen] = useState(false);
   const [availabilityRows, setAvailabilityRows] = useState<AvailabilityApiRow[]>([]);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState("");
@@ -105,6 +107,7 @@ export default function UserAvailabilityForm() {
 
     if (managerMode === "new") {
       setSelectedExistingUserId("");
+      setExistingUserSearch("");
       setName("");
       setRole("staff");
       setMinHours(0);
@@ -117,13 +120,8 @@ export default function UserAvailabilityForm() {
 
     if (managerUsers.length === 0) {
       setSelectedExistingUserId("");
-      return;
     }
-
-    if (selectedExistingUserId === "") {
-      setSelectedExistingUserId(managerUsers[0].id);
-    }
-  }, [authUser?.role, managerMode, managerUsers, selectedExistingUserId]);
+  }, [authUser?.role, managerMode, managerUsers]);
 
   useEffect(() => {
     if (authUser?.role !== "manager" || managerMode !== "existing" || selectedExistingUserId === "") return;
@@ -348,6 +346,9 @@ export default function UserAvailabilityForm() {
   };
 
   const showInputs = authUser?.role !== "manager" || managerMode !== null;
+  const filteredManagerUsers = managerUsers.filter(user =>
+    user.name.toLowerCase().includes(existingUserSearch.trim().toLowerCase())
+  );
 
   return (
     <section className="availability-form">
@@ -392,24 +393,42 @@ export default function UserAvailabilityForm() {
                   {managerMode === "existing" && (
                     <label className="availability-form__field">
                       <span>Select Existing User</span>
-                      <select
-                        value={selectedExistingUserId}
-                        onChange={e => {
-                          const nextValue = e.target.value;
-                          setSelectedExistingUserId(nextValue === "" ? "" : Number(nextValue));
-                        }}
-                        disabled={managerUsers.length === 0}
-                      >
-                        {managerUsers.length === 0 ? (
-                          <option value="">No users available</option>
-                        ) : (
-                          managerUsers.map(user => (
-                            <option key={user.id} value={user.id}>
-                              {user.name}
-                            </option>
-                          ))
+                      <div className="availability-form__user-picker">
+                        <input
+                          type="text"
+                          value={existingUserSearch}
+                          placeholder={managerUsers.length === 0 ? "No users available" : "Search user by name..."}
+                          onChange={e => {
+                            setExistingUserSearch(e.target.value);
+                            setIsExistingUserMenuOpen(true);
+                          }}
+                          onFocus={() => setIsExistingUserMenuOpen(true)}
+                          onBlur={() => window.setTimeout(() => setIsExistingUserMenuOpen(false), 120)}
+                          disabled={managerUsers.length === 0}
+                        />
+                        {isExistingUserMenuOpen && managerUsers.length > 0 && (
+                          <div className="availability-form__user-menu">
+                            {filteredManagerUsers.length === 0 ? (
+                              <div className="availability-form__user-item availability-form__user-item--empty">No matches</div>
+                            ) : (
+                              filteredManagerUsers.map(user => (
+                                <button
+                                  key={user.id}
+                                  type="button"
+                                  className={`availability-form__user-item${selectedExistingUserId === user.id ? " availability-form__user-item--active" : ""}`}
+                                  onMouseDown={() => {
+                                    setSelectedExistingUserId(user.id);
+                                    setExistingUserSearch(user.name);
+                                    setIsExistingUserMenuOpen(false);
+                                  }}
+                                >
+                                  {user.name}
+                                </button>
+                              ))
+                            )}
+                          </div>
                         )}
-                      </select>
+                      </div>
                     </label>
                   )}
                   <label className="availability-form__field">
