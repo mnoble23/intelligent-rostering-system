@@ -243,11 +243,15 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
     : "";
 
   const selectedCellLabel = selectedCell ? `${selectedUserName} on ${formatDayLabel(selectedCell.dayIndex, weekStartDate)}` : "";
+  const hasExistingAssignment = assignedShiftsForSelection.length > 0;
 
   return (
-    <div style={{ maxWidth: 900, margin: "20px auto" }}>
-      <h2>Manage Shifts</h2>
-      {status && <p>{status}</p>}
+    <div className="manage-shifts">
+      <header className="manage-shifts__header">
+        <h2>Manage Shifts</h2>
+        <p>Click any employee/day cell to open quick assignment actions.</p>
+      </header>
+      {status && <p className="manage-shifts__status">{status}</p>}
 
       <RosterTable
         shifts={shifts}
@@ -278,15 +282,18 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
           >
             <header className="shift-modal__header">
               <h3>Manage Shift</h3>
-              <button type="button" onClick={() => setSelectedCell(null)} disabled={isSubmitting}>
+              <button type="button" className="shift-modal__close" onClick={() => setSelectedCell(null)} disabled={isSubmitting}>
                 Close
               </button>
             </header>
 
-            <p className="shift-modal__selected">{selectedCellLabel}</p>
+            <p className="shift-modal__selected">
+              <span>Selected</span>
+              <strong>{selectedCellLabel}</strong>
+            </p>
 
-            <label>
-              Current assigned shift
+            <label className="shift-modal__field">
+              <span>Current assigned shift</span>
               <select
                 value={currentShiftId}
                 onChange={e => {
@@ -315,43 +322,43 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
               </select>
             </label>
 
-            <label>
-              Start time
-              <input
-                type="time"
-                value={startTime}
-                onChange={e => setStartTime(e.target.value)}
-                disabled={isSubmitting}
-              />
-            </label>
+            <div className="shift-modal__time-grid">
+              <label className="shift-modal__field">
+                <span>Start time</span>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={e => setStartTime(e.target.value)}
+                  disabled={isSubmitting}
+                />
+              </label>
 
-            <label>
-              End time
-              <input
-                type="time"
-                value={endTime}
-                onChange={e => setEndTime(e.target.value)}
-                disabled={isSubmitting}
-              />
-            </label>
-
-            {dayShiftOptions.length > 0 && (
-              <p className="shift-modal__hint">
-                Existing {formatDayLabel(selectedCell.dayIndex, weekStartDate)} shifts:{" "}
-                {dayShiftOptions.map(shift => `${formatTime(shift.start_time)}-${formatTime(shift.end_time)}`).join(", ")}
-              </p>
-            )}
+              <label className="shift-modal__field">
+                <span>End time</span>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={e => setEndTime(e.target.value)}
+                  disabled={isSubmitting}
+                />
+              </label>
+            </div>
 
             <div className="shift-modal__actions">
-              <button type="button" onClick={handleAdd} disabled={isSubmitting}>
-                Add
-              </button>
-              <button type="button" onClick={handleRemove} disabled={isSubmitting || currentShiftId === ""}>
-                Remove
-              </button>
-              <button type="button" onClick={handleChange} disabled={isSubmitting || currentShiftId === ""}>
-                Change
-              </button>
+              {!hasExistingAssignment ? (
+                <button type="button" className="shift-modal__action shift-modal__action--primary" onClick={handleAdd} disabled={isSubmitting}>
+                  Add
+                </button>
+              ) : (
+                <>
+                  <button type="button" className="shift-modal__action shift-modal__action--danger" onClick={handleRemove} disabled={isSubmitting || currentShiftId === ""}>
+                    Remove
+                  </button>
+                  <button type="button" className="shift-modal__action" onClick={handleChange} disabled={isSubmitting || currentShiftId === ""}>
+                    Change
+                  </button>
+                </>
+              )}
             </div>
           </section>
         </div>
