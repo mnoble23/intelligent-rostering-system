@@ -247,10 +247,6 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
 
   return (
     <div className="manage-shifts">
-      <header className="manage-shifts__header">
-        <h2>Manage Shifts</h2>
-        <p>Click any employee/day cell to open quick assignment actions.</p>
-      </header>
       {status && <p className="manage-shifts__status">{status}</p>}
 
       <RosterTable
