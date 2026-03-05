@@ -126,8 +126,14 @@ export default function App() {
     demoHostMatch;
 
   const role = authUser?.role ?? null;
+  const resetRouteToDashboard = useCallback(() => {
+    if (window.location.pathname !== "/") {
+      window.history.replaceState(null, "", "/");
+    }
+  }, []);
 
   const clearAuth = useCallback(() => {
+    resetRouteToDashboard();
     setAuthToken(null);
     setAuthUser(null);
     setAuthView("chooser");
@@ -135,7 +141,7 @@ export default function App() {
     setShifts([]);
     setAvailableWeeks([]);
     setSelectedWeek("");
-  }, []);
+  }, [resetRouteToDashboard]);
 
   useEffect(() => {
     setAuthErrorHandlers({
@@ -223,6 +229,7 @@ export default function App() {
   if (!role) {
     if (authView === "login") {
       return <Login onLoginSuccess={user => {
+        resetRouteToDashboard();
         setAuthUser(user);
         setAuthzMessage("");
       }} onBack={() => setAuthView("chooser")} />;
@@ -230,6 +237,7 @@ export default function App() {
 
     if (authView === "create") {
       return <CreateWorkplace onCreateSuccess={user => {
+        resetRouteToDashboard();
         setAuthUser(user);
         setIsBootstrapped(true);
         setAuthzMessage("");
