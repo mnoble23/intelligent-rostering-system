@@ -63,8 +63,11 @@ function formatWeekOption(weekStartDate: string) {
 
 function PageWeekSelector({ selectedWeek, availableWeeks, onChange }: WeekSelectorProps) {
   return (
-    <div className="app-page-week">
-      <label htmlFor="page-week-select" className="app-page-week__label">Roster Week</label>
+    <div className="app-page-week" aria-label="Roster week selector">
+      <div className="app-page-week__intro">
+        <p className="app-page-week__eyebrow">Week Context</p>
+        <label htmlFor="page-week-select" className="app-page-week__label">Roster Week</label>
+      </div>
       <select
         id="page-week-select"
         className="app-page-week__select"

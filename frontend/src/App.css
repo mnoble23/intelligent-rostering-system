@@ -121,32 +121,50 @@
 
 .app-page-week {
   align-items: center;
-  background: #f5fafe;
-  border: 1px solid #d3e2ef;
-  border-radius: 10px;
-  display: inline-flex;
-  gap: 8px;
-  margin: 4px 0 12px;
-  padding: 7px 10px;
+  background: linear-gradient(120deg, #f5fbff 0%, #eef7ff 60%, #f8fcf2 100%);
+  border: 2px solid #7fb3de;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(31, 74, 113, 0.12);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 4px 0 14px;
+  padding: 9px 12px;
+  position: sticky;
+  top: 8px;
+  z-index: 6;
+}
+
+.app-page-week__intro {
+  display: grid;
+  gap: 2px;
+}
+
+.app-page-week__eyebrow {
+  color: #2c6f9f;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
 }
 
 .app-page-week__label {
-  color: #3a5875;
-  font-size: 0.78rem;
+  color: #1d4266;
+  font-size: 0.86rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .app-page-week__select {
   background: #fff;
-  border: 1px solid #c8d7e7;
+  border: 2px solid #92b7d8;
   border-radius: 9px;
-  color: #173552;
-  font-size: 0.88rem;
+  color: #112f4a;
+  font-size: 0.95rem;
   font-weight: 700;
-  min-width: 220px;
-  padding: 6px 10px;
+  min-width: 260px;
+  padding: 8px 11px;
 }
 
 @media (max-width: 760px) {
@@ -212,6 +230,7 @@
   .app-page-week {
     display: grid;
     justify-items: start;
+    position: static;
   }
 
   .app-page-week__select {
