@@ -12,6 +12,7 @@ from app.models.shift_assignment_db import ShiftAssignmentDB
 from app.models.shift_db import ShiftDB
 from app.models.user_db import UserDB
 from app.models.workplace_db import WorkplaceDB
+from app.user_utils import build_placeholder_email
 
 router = APIRouter(
     prefix="/admin",
@@ -30,6 +31,7 @@ def _create_demo_user(
 ) -> UserDB:
     user = UserDB(
         name=name,
+        email=build_placeholder_email(name, workplace_id),
         role=role,
         min_hours=min_hours,
         max_hours=max_hours,

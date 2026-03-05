@@ -6,6 +6,7 @@ from app.auth_utils import create_access_token, hash_password
 from app.db.session import get_db
 from app.models.user_db import UserDB
 from app.models.workplace_db import WorkplaceDB
+from app.user_utils import build_placeholder_email
 
 router = APIRouter(
     prefix="/onboarding",
@@ -66,6 +67,7 @@ def create_workplace(payload: CreateWorkplaceRequest, db: Session = Depends(get_
 
     manager = UserDB(
         name=manager_name,
+        email=build_placeholder_email(manager_name, workplace.id),
         role="manager",
         min_hours=0.0,
         max_hours=40.0,

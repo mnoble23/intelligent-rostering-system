@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 import os
 
@@ -10,6 +11,7 @@ from app.models.availability_db import AvailabilityDB
 from app.models.shift_assignment_db import ShiftAssignmentDB
 from app.models.user_db import UserDB
 from app.schemas.user import UserCreate, UserRead
+from app.user_utils import build_placeholder_email
 
 router = APIRouter(
     prefix="/users",
@@ -92,16 +94,23 @@ def create_user(
         existing_user.max_hours = user.max_hours
         existing_user.min_shifts_per_week = user.min_shifts_per_week
         existing_user.max_shifts_per_week = user.max_shifts_per_week
+        if not existing_user.email:
+            existing_user.email = build_placeholder_email(normalized_name, current_user.workplace_id)
         existing_user.is_active = True
         if raw_password:
             existing_user.password_hash = hash_password(raw_password)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            raise HTTPException(status_code=400, detail="Unable to update user with provided details") from exc
         db.refresh(existing_user)
         return existing_user
 
     password_to_store = raw_password or default_password
     db_user = UserDB(
         name=normalized_name,
+        email=build_placeholder_email(normalized_name, current_user.workplace_id),
         role=normalized_role,
         min_hours=user.min_hours,
         max_hours=user.max_hours,
@@ -112,7 +121,11 @@ def create_user(
         workplace_id=current_user.workplace_id,
     )
     db.add(db_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Unable to create user with provided details") from exc
     db.refresh(db_user)
     return db_user
 

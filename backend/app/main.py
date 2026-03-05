@@ -75,6 +75,16 @@ with engine.begin() as connection:
         connection.execute(
             text('ALTER TABLE "user" ADD COLUMN role VARCHAR NOT NULL DEFAULT \'staff\'')
         )
+    has_email_column = "email" in user_columns
+    if not has_email_column:
+        connection.execute(
+            text('ALTER TABLE "user" ADD COLUMN email VARCHAR')
+        )
+        has_email_column = True
+    if has_email_column:
+        connection.execute(
+            text('UPDATE "user" SET email = \'user-\' || id::text || \'@local.invalid\' WHERE email IS NULL OR email = \'\'')
+        )
     if "password_hash" not in user_columns:
         default_password = os.getenv("DEFAULT_USER_PASSWORD", "ChangeMe123!")
         connection.execute(
