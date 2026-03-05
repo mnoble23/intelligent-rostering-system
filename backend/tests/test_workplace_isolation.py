@@ -253,7 +253,7 @@ def test_workplace_constraints_can_be_read_and_updated_by_manager():
     assert get_response.status_code == 200
     assert get_response.json()["min_staff_per_shift"] == 2
     assert get_response.json()["min_managers_per_hour"] == 1
-    assert get_response.json()["max_consecutive_shifts"] == 5
+    assert get_response.json()["max_consecutive_shifts"] == 7
     assert get_response.json()["min_hours_between_shifts"] == 11
 
     put_response = client.put(

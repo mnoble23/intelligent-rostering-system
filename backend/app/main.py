@@ -137,13 +137,17 @@ with engine.begin() as connection:
             text('ALTER TABLE "workplace" ADD COLUMN max_consecutive_shifts INTEGER')
         )
         connection.execute(
-            text('UPDATE "workplace" SET max_consecutive_shifts = 5 WHERE max_consecutive_shifts IS NULL')
+            text('UPDATE "workplace" SET max_consecutive_shifts = 7 WHERE max_consecutive_shifts IS NULL')
         )
         connection.execute(
-            text('ALTER TABLE "workplace" ALTER COLUMN max_consecutive_shifts SET DEFAULT 5')
+            text('ALTER TABLE "workplace" ALTER COLUMN max_consecutive_shifts SET DEFAULT 7')
         )
         connection.execute(
             text('ALTER TABLE "workplace" ALTER COLUMN max_consecutive_shifts SET NOT NULL')
+        )
+    if "max_consecutive_shifts" in workplace_columns:
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN max_consecutive_shifts SET DEFAULT 7')
         )
     if "min_hours_between_shifts" not in workplace_columns:
         connection.execute(
