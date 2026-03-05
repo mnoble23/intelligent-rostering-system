@@ -83,30 +83,6 @@
   padding-bottom: 10px;
 }
 
-.app-sidebar__week-picker {
-  display: grid;
-  gap: 6px;
-}
-
-.app-sidebar__week-picker label {
-  color: #9fb8d0;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.app-sidebar__week-picker select {
-  background: #f2f8ff;
-  border: 1px solid #c9d9ea;
-  border-radius: 10px;
-  color: #1f3b56;
-  font-size: 0.9rem;
-  font-weight: 700;
-  padding: 8px 10px;
-  width: 100%;
-}
-
 .app-sidebar__switch {
   background: #f2f8ff;
   border: 1px solid #c9d9ea;
@@ -141,6 +117,36 @@
   color: #9f2323;
   margin: 6px 0 12px;
   padding: 9px 12px;
+}
+
+.app-page-week {
+  align-items: center;
+  background: #f5fafe;
+  border: 1px solid #d3e2ef;
+  border-radius: 10px;
+  display: inline-flex;
+  gap: 8px;
+  margin: 4px 0 12px;
+  padding: 7px 10px;
+}
+
+.app-page-week__label {
+  color: #3a5875;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-page-week__select {
+  background: #fff;
+  border: 1px solid #c8d7e7;
+  border-radius: 9px;
+  color: #173552;
+  font-size: 0.88rem;
+  font-weight: 700;
+  min-width: 220px;
+  padding: 6px 10px;
 }
 
 @media (max-width: 760px) {
@@ -195,15 +201,21 @@
     padding-bottom: 2px;
   }
 
-  .app-sidebar__week-picker select {
-    width: auto;
-  }
-
   .app-sidebar__switch {
     width: auto;
   }
 
   .app-content {
     padding: 8px 10px 18px;
+  }
+
+  .app-page-week {
+    display: grid;
+    justify-items: start;
+  }
+
+  .app-page-week__select {
+    min-width: 0;
+    width: 100%;
   }
 }

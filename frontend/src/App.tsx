@@ -21,6 +21,11 @@ interface DashboardPageProps {
   shifts: any[];
   weekStartDate?: string;
 }
+interface WeekSelectorProps {
+  selectedWeek: string;
+  availableWeeks: string[];
+  onChange: (value: string) => void;
+}
 
 type AppRole = "manager" | "staff";
 type AuthView = "chooser" | "login" | "create";
@@ -54,6 +59,31 @@ function formatWeekOption(weekStartDate: string) {
   const mm = String(month).padStart(2, "0");
   const yyyy = String(year);
   return `Week ${weekNumber} - ${dd}/${mm}/${yyyy}`;
+}
+
+function PageWeekSelector({ selectedWeek, availableWeeks, onChange }: WeekSelectorProps) {
+  return (
+    <div className="app-page-week">
+      <label htmlFor="page-week-select" className="app-page-week__label">Roster Week</label>
+      <select
+        id="page-week-select"
+        className="app-page-week__select"
+        value={selectedWeek}
+        onChange={event => onChange(event.target.value)}
+        disabled={availableWeeks.length === 0}
+      >
+        {availableWeeks.length === 0 ? (
+          <option value="">No roster weeks</option>
+        ) : (
+          availableWeeks.map(week => (
+            <option key={week} value={week}>
+              {formatWeekOption(week)}
+            </option>
+          ))
+        )}
+      </select>
+    </div>
+  );
 }
 
 function DashboardPage({ shifts, weekStartDate }: DashboardPageProps) {
@@ -295,25 +325,6 @@ export default function App() {
               </section>
             ))}
           </nav>
-          <div className="app-sidebar__week-picker">
-            <label htmlFor="week-select">Roster Week</label>
-            <select
-              id="week-select"
-              value={selectedWeek}
-              onChange={event => setSelectedWeek(event.target.value)}
-              disabled={availableWeeks.length === 0}
-            >
-              {availableWeeks.length === 0 ? (
-                <option value="">No roster weeks</option>
-              ) : (
-                availableWeeks.map(week => (
-                  <option key={week} value={week}>
-                    {formatWeekOption(week)}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
         </aside>
 
         <main className="app-content">
@@ -328,7 +339,14 @@ export default function App() {
               path="/"
               element={(
                 <RoleGate role={role} allowedRoles={["manager", "staff"]}>
-                  <DashboardPage shifts={shifts} weekStartDate={selectedWeek || undefined} />
+                  <>
+                    <PageWeekSelector
+                      selectedWeek={selectedWeek}
+                      availableWeeks={availableWeeks}
+                      onChange={setSelectedWeek}
+                    />
+                    <DashboardPage shifts={shifts} weekStartDate={selectedWeek || undefined} />
+                  </>
                 </RoleGate>
               )}
             />
@@ -336,7 +354,14 @@ export default function App() {
               path="/shift-coverage"
               element={(
                 <RoleGate role={role} allowedRoles={["manager"]}>
-                  <ShiftCoverage weekStartDate={selectedWeek || undefined} />
+                  <>
+                    <PageWeekSelector
+                      selectedWeek={selectedWeek}
+                      availableWeeks={availableWeeks}
+                      onChange={setSelectedWeek}
+                    />
+                    <ShiftCoverage weekStartDate={selectedWeek || undefined} />
+                  </>
                 </RoleGate>
               )}
             />
@@ -372,7 +397,14 @@ export default function App() {
               path="/manage-shifts"
               element={(
                 <RoleGate role={role} allowedRoles={["manager"]}>
-                  <ManageShiftAssignments weekStartDate={selectedWeek || undefined} />
+                  <>
+                    <PageWeekSelector
+                      selectedWeek={selectedWeek}
+                      availableWeeks={availableWeeks}
+                      onChange={setSelectedWeek}
+                    />
+                    <ManageShiftAssignments weekStartDate={selectedWeek || undefined} />
+                  </>
                 </RoleGate>
               )}
             />
@@ -401,7 +433,14 @@ export default function App() {
               path="/my-roster"
               element={(
                 <RoleGate role={role} allowedRoles={["manager", "staff"]}>
-                  <MyRoster weekStartDate={selectedWeek || undefined} />
+                  <>
+                    <PageWeekSelector
+                      selectedWeek={selectedWeek}
+                      availableWeeks={availableWeeks}
+                      onChange={setSelectedWeek}
+                    />
+                    <MyRoster weekStartDate={selectedWeek || undefined} />
+                  </>
                 </RoleGate>
               )}
             />
@@ -409,7 +448,14 @@ export default function App() {
               path="/my-profile"
               element={(
                 <RoleGate role={role} allowedRoles={["manager", "staff"]}>
-                  <MyProfile weekStartDate={selectedWeek || undefined} />
+                  <>
+                    <PageWeekSelector
+                      selectedWeek={selectedWeek}
+                      availableWeeks={availableWeeks}
+                      onChange={setSelectedWeek}
+                    />
+                    <MyProfile weekStartDate={selectedWeek || undefined} />
+                  </>
                 </RoleGate>
               )}
             />
