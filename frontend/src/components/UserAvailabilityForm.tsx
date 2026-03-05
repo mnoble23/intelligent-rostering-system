@@ -40,7 +40,7 @@ interface DayPlan {
   blocks: TimeBlock[];
 }
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const BUSINESS_OPEN = "06:00";
 const BUSINESS_CLOSE = "22:00";
 

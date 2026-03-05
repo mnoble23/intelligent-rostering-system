@@ -240,9 +240,15 @@
 }
 
 .availability-day-card__head h4 {
-  color: #1c364d;
+  background: linear-gradient(135deg, #0f5c94 0%, #0b4b79 100%);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 0.96rem;
+  letter-spacing: 0.02em;
   margin: 0;
-  min-width: 44px;
+  min-width: 110px;
+  padding: 6px 10px;
+  text-align: center;
 }
 
 .availability-day-card__modes {
