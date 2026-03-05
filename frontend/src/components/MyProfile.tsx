@@ -79,7 +79,7 @@ export default function MyProfile({ weekStartDate }: MyProfileProps) {
     const loadData = async () => {
       try {
         const [usersRes, availabilityRes, rosterRes, meRes] = await Promise.all([
-          API.get("/users"),
+          API.get("/users/"),
           API.get("/availability"),
           API.get("/roster", weekStartDate ? { params: { week_start_date: weekStartDate } } : undefined),
           API.get<AuthUser>("/auth/me"),

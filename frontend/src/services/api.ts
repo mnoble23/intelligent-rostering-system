@@ -141,7 +141,12 @@ export function formatApiError(error: unknown, options: FormatApiErrorOptions) {
   }
 
   if ((error as any)?.request && !(error as any)?.response) {
-    return "Could not reach the server. Check your connection and try again.";
+    const apiBase = API.defaults.baseURL || API_BASE_URL;
+    const pageProtocol = typeof window !== "undefined" ? window.location.protocol : "";
+    if (pageProtocol === "https:" && /^http:\/\//i.test(apiBase)) {
+      return "Could not reach the server. Your app is on HTTPS but API_BASE_URL is HTTP, which browsers block. Use an HTTPS backend URL.";
+    }
+    return `Could not reach the server at ${apiBase}. Check backend uptime, CORS_ALLOW_ORIGINS, and REACT_APP_API_BASE_URL.`;
   }
 
   return options.fallbackMessage;

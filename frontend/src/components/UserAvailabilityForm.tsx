@@ -161,7 +161,7 @@ export default function UserAvailabilityForm() {
     try {
       let userId: number | null = null;
       if (authUser?.role === "manager") {
-        const userRes = await API.post("/users", {
+        const userRes = await API.post("/users/", {
           name,
           role,
           min_hours: minHours,

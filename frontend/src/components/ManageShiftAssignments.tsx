@@ -59,7 +59,7 @@ export default function ManageShiftAssignments({ weekStartDate }: ManageShiftAss
   const loadData = useCallback(async () => {
     try {
       const [usersRes, shiftsRes] = await Promise.all([
-        API.get("/users"),
+        API.get("/users/"),
         API.get("/roster", weekStartDate ? { params: { week_start_date: weekStartDate } } : undefined),
       ]);
       setUsers(usersRes.data.map((user: User) => ({ id: user.id, name: user.name })));

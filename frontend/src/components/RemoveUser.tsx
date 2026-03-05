@@ -24,7 +24,7 @@ export default function RemoveUser({ refreshRoster }: RemoveUserProps) {
 
   const loadUsers = async () => {
     try {
-      const response = await API.get<User[]>("/users");
+      const response = await API.get<User[]>("/users/");
       setUsers(response.data);
       setSelectedUserId(current => {
         if (!response.data.length) return "";

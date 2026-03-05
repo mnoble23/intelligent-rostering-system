@@ -60,7 +60,7 @@ export default function MyRoster({ weekStartDate }: MyRosterProps) {
     const loadData = async () => {
       try {
         const [usersRes, shiftsRes, meRes] = await Promise.all([
-          API.get("/users"),
+          API.get("/users/"),
           API.get("/roster", weekStartDate ? { params: { week_start_date: weekStartDate } } : undefined),
           API.get<AuthUser>("/auth/me"),
         ]);
