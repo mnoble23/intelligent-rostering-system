@@ -2,13 +2,6 @@ import { useEffect, useState } from "react";
 import API, { formatApiError } from "../services/api";
 import "./UserAvailabilityForm.css";
 
-interface Availability {
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  is_full_day: boolean;
-}
-
 interface AvailabilityApiRow {
   id: number;
   user_id: number;
@@ -34,62 +27,102 @@ interface ManagerUser {
 }
 
 type ManagerMode = "new" | "existing";
+type DayMode = "unavailable" | "full" | "custom";
 
-function hhmmToMinutes(value: string) {
-  const [hours, minutes] = value.split(":").map(Number);
-  return hours * 60 + minutes;
+interface TimeBlock {
+  start_time: string;
+  end_time: string;
 }
+
+interface DayPlan {
+  day_of_week: number;
+  mode: DayMode;
+  blocks: TimeBlock[];
+}
+
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const BUSINESS_OPEN = "06:00";
+const BUSINESS_CLOSE = "22:00";
 
 function toHHMM(value: string) {
   const [hour = "00", minute = "00"] = value.split(":");
   return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
 }
 
-function mapApiAvailabilityToForm(rows: AvailabilityApiRow[], businessOpen: string, businessClose: string): Availability[] {
-  const mapped = rows
-    .sort((a, b) => {
-      if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
-      return a.start_time.localeCompare(b.start_time);
-    })
-    .map(row => {
-      const start = toHHMM(row.start_time);
-      const end = toHHMM(row.end_time);
-      return {
-        day_of_week: row.day_of_week,
-        start_time: start,
-        end_time: end,
-        is_full_day: start === businessOpen && end === businessClose,
-      };
-    });
+function hhmmToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
 
-  return mapped.length > 0
-    ? mapped
-    : [{ day_of_week: 0, start_time: "", end_time: "", is_full_day: false }];
+function buildEmptyDayPlans(): DayPlan[] {
+  return DAYS.map((_, dayIndex) => ({
+    day_of_week: dayIndex,
+    mode: "custom" as DayMode,
+    blocks: [{ start_time: "", end_time: "" }],
+  }));
+}
+
+function mapApiAvailabilityToDayPlans(rows: AvailabilityApiRow[]): DayPlan[] {
+  const grouped = new Map<number, TimeBlock[]>();
+  for (const row of rows) {
+    const list = grouped.get(row.day_of_week) ?? [];
+    list.push({
+      start_time: toHHMM(row.start_time),
+      end_time: toHHMM(row.end_time),
+    });
+    grouped.set(row.day_of_week, list);
+  }
+
+  return DAYS.map((_, dayIndex) => {
+    const blocks = (grouped.get(dayIndex) ?? []).sort((a, b) => a.start_time.localeCompare(b.start_time));
+    if (blocks.length === 0) {
+      return {
+        day_of_week: dayIndex,
+        mode: "custom" as DayMode,
+        blocks: [{ start_time: "", end_time: "" }],
+      };
+    }
+
+    const isFullDayOnly =
+      blocks.length === 1 &&
+      blocks[0].start_time === BUSINESS_OPEN &&
+      blocks[0].end_time === BUSINESS_CLOSE;
+
+    if (isFullDayOnly) {
+      return {
+        day_of_week: dayIndex,
+        mode: "full" as DayMode,
+        blocks,
+      };
+    }
+
+    return {
+      day_of_week: dayIndex,
+      mode: "custom" as DayMode,
+      blocks,
+    };
+  });
 }
 
 export default function UserAvailabilityForm() {
-  const BUSINESS_OPEN = "06:00";
-  const BUSINESS_CLOSE = "22:00";
   const [name, setName] = useState("");
   const [role, setRole] = useState<"staff" | "manager">("staff");
   const [minHours, setMinHours] = useState(0);
   const [maxHours, setMaxHours] = useState(40);
   const [minShiftsPerWeek, setMinShiftsPerWeek] = useState(1);
   const [maxShiftsPerWeek, setMaxShiftsPerWeek] = useState(7);
-  const [availability, setAvailability] = useState<Availability[]>([
-    { day_of_week: 0, start_time: "", end_time: "", is_full_day: false },
-  ]);
+  const [dayPlans, setDayPlans] = useState<DayPlan[]>(buildEmptyDayPlans());
+
   const [managerMode, setManagerMode] = useState<ManagerMode | null>(null);
   const [managerUsers, setManagerUsers] = useState<ManagerUser[]>([]);
   const [selectedExistingUserId, setSelectedExistingUserId] = useState<number | "">("");
   const [existingUserSearch, setExistingUserSearch] = useState("");
   const [isExistingUserMenuOpen, setIsExistingUserMenuOpen] = useState(false);
   const [availabilityRows, setAvailabilityRows] = useState<AvailabilityApiRow[]>([]);
+
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState("");
   const [statusType, setStatusType] = useState<"idle" | "success" | "error">("idle");
-
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -101,7 +134,7 @@ export default function UserAvailabilityForm() {
           setName(meResponse.data.name);
           setRole("staff");
           const availabilityResponse = await API.get<AvailabilityApiRow[]>("/availability");
-          setAvailability(mapApiAvailabilityToForm(availabilityResponse.data ?? [], BUSINESS_OPEN, BUSINESS_CLOSE));
+          setDayPlans(mapApiAvailabilityToDayPlans(availabilityResponse.data ?? []));
           return;
         }
 
@@ -138,7 +171,7 @@ export default function UserAvailabilityForm() {
       setMaxHours(40);
       setMinShiftsPerWeek(1);
       setMaxShiftsPerWeek(7);
-      setAvailability([{ day_of_week: 0, start_time: "", end_time: "", is_full_day: false }]);
+      setDayPlans(buildEmptyDayPlans());
       return;
     }
 
@@ -161,38 +194,69 @@ export default function UserAvailabilityForm() {
     setMaxShiftsPerWeek(selectedUser.max_shifts_per_week);
 
     const selectedAvailability = availabilityRows.filter(row => row.user_id === selectedUser.id);
-    setAvailability(mapApiAvailabilityToForm(selectedAvailability, BUSINESS_OPEN, BUSINESS_CLOSE));
-  }, [authUser?.role, managerMode, selectedExistingUserId, managerUsers, availabilityRows, BUSINESS_OPEN, BUSINESS_CLOSE]);
+    setDayPlans(mapApiAvailabilityToDayPlans(selectedAvailability));
+  }, [authUser?.role, managerMode, selectedExistingUserId, managerUsers, availabilityRows]);
 
-  const addAvailability = () => {
-    setAvailability([...availability, { day_of_week: 0, start_time: "", end_time: "", is_full_day: false }]);
-  };
-
-  const removeAvailability = (index: number) => {
-    setAvailability(availability.filter((_, i) => i !== index));
-  };
-
-  const updateAvailability = (index: number, field: keyof Availability, value: any) => {
-    setAvailability(prev => prev.map((av, i) => (i === index ? { ...av, [field]: value } : av)));
-  };
-
-  const toggleFullDayAvailability = (index: number, isChecked: boolean) => {
-    setAvailability(prev =>
-      prev.map((av, i) => {
-        if (i !== index) return av;
-        if (isChecked) {
+  const updateDayMode = (dayIndex: number, mode: DayMode) => {
+    setDayPlans(prev =>
+      prev.map(plan => {
+        if (plan.day_of_week !== dayIndex) return plan;
+        if (mode === "full") {
           return {
-            ...av,
-            is_full_day: true,
-            start_time: BUSINESS_OPEN,
-            end_time: BUSINESS_CLOSE,
+            ...plan,
+            mode,
+            blocks: [{ start_time: BUSINESS_OPEN, end_time: BUSINESS_CLOSE }],
+          };
+        }
+        if (mode === "unavailable") {
+          return {
+            ...plan,
+            mode,
+            blocks: [{ start_time: "", end_time: "" }],
           };
         }
         return {
-          ...av,
-          is_full_day: false,
-          start_time: "",
-          end_time: "",
+          ...plan,
+          mode,
+          blocks: plan.blocks.length > 0 ? plan.blocks : [{ start_time: "", end_time: "" }],
+        };
+      })
+    );
+  };
+
+  const updateBlock = (dayIndex: number, blockIndex: number, field: keyof TimeBlock, value: string) => {
+    setDayPlans(prev =>
+      prev.map(plan => {
+        if (plan.day_of_week !== dayIndex) return plan;
+        return {
+          ...plan,
+          blocks: plan.blocks.map((block, idx) => (idx === blockIndex ? { ...block, [field]: value } : block)),
+        };
+      })
+    );
+  };
+
+  const addExtraBlock = (dayIndex: number) => {
+    setDayPlans(prev =>
+      prev.map(plan => {
+        if (plan.day_of_week !== dayIndex) return plan;
+        return {
+          ...plan,
+          mode: "custom",
+          blocks: [...plan.blocks, { start_time: "", end_time: "" }],
+        };
+      })
+    );
+  };
+
+  const removeBlock = (dayIndex: number, blockIndex: number) => {
+    setDayPlans(prev =>
+      prev.map(plan => {
+        if (plan.day_of_week !== dayIndex) return plan;
+        if (plan.blocks.length <= 1) return plan;
+        return {
+          ...plan,
+          blocks: plan.blocks.filter((_, idx) => idx !== blockIndex),
         };
       })
     );
@@ -235,35 +299,74 @@ export default function UserAvailabilityForm() {
       return;
     }
 
-    for (const av of availability) {
-      if (!av.start_time || !av.end_time) {
-        setStatus("All availability rows must have start and end times.");
-        setStatusType("error");
-        return;
-      }
-      if (av.start_time >= av.end_time) {
-        setStatus("Start time must be before end time.");
-        setStatusType("error");
-        return;
-      }
-    }
+    const payloadAvailability: Array<{
+      user_id: number;
+      day_of_week: number;
+      start_time: string;
+      end_time: string;
+    }> = [];
 
-    for (let day = 0; day < 7; day += 1) {
-      const dayEntries = availability
-        .filter(av => av.day_of_week === day)
-        .map(av => ({
-          start: hhmmToMinutes(av.start_time),
-          end: hhmmToMinutes(av.end_time),
+    for (const plan of dayPlans) {
+      if (plan.mode === "unavailable") continue;
+
+      if (plan.mode === "full") {
+        payloadAvailability.push({
+          user_id: 0,
+          day_of_week: plan.day_of_week,
+          start_time: `${BUSINESS_OPEN}:00`,
+          end_time: `${BUSINESS_CLOSE}:00`,
+        });
+        continue;
+      }
+
+      const normalizedBlocks = plan.blocks
+        .map(block => ({
+          start: block.start_time,
+          end: block.end_time,
         }))
-        .sort((a, b) => a.start - b.start);
+        .sort((a, b) => a.start.localeCompare(b.start));
 
-      for (let i = 1; i < dayEntries.length; i += 1) {
-        if (dayEntries[i].start < dayEntries[i - 1].end) {
-          setStatus(`Availability blocks overlap on ${days[day]}. Adjust times and try again.`);
+      if (normalizedBlocks.length === 0) {
+        setStatus(`Add at least one time block for ${DAYS[plan.day_of_week]}.`);
+        setStatusType("error");
+        return;
+      }
+
+      for (const block of normalizedBlocks) {
+        if (!block.start || !block.end) {
+          setStatus(`Complete all start/end times for ${DAYS[plan.day_of_week]}.`);
+          setStatusType("error");
+          return;
+        }
+        if (block.start >= block.end) {
+          setStatus(`End time must be later than start time for ${DAYS[plan.day_of_week]}.`);
           setStatusType("error");
           return;
         }
       }
+
+      for (let i = 1; i < normalizedBlocks.length; i += 1) {
+        if (hhmmToMinutes(normalizedBlocks[i].start) < hhmmToMinutes(normalizedBlocks[i - 1].end)) {
+          setStatus(`Availability blocks overlap on ${DAYS[plan.day_of_week]}. Adjust times and try again.`);
+          setStatusType("error");
+          return;
+        }
+      }
+
+      for (const block of normalizedBlocks) {
+        payloadAvailability.push({
+          user_id: 0,
+          day_of_week: plan.day_of_week,
+          start_time: `${block.start}:00`,
+          end_time: `${block.end}:00`,
+        });
+      }
+    }
+
+    if (payloadAvailability.length === 0) {
+      setStatus("At least one available day/block is required before submitting.");
+      setStatusType("error");
+      return;
     }
 
     try {
@@ -294,12 +397,7 @@ export default function UserAvailabilityForm() {
       }
 
       await API.post("/availability/bulk", {
-        availabilities: availability.map(av => ({
-          user_id: userId,
-          day_of_week: av.day_of_week,
-          start_time: `${av.start_time}:00`,
-          end_time: `${av.end_time}:00`,
-        })),
+        availabilities: payloadAvailability.map(entry => ({ ...entry, user_id: userId as number })),
       });
 
       if (authUser?.role === "manager" && managerMode === "existing") {
@@ -325,11 +423,11 @@ export default function UserAvailabilityForm() {
           setMaxHours(40);
           setMinShiftsPerWeek(1);
           setMaxShiftsPerWeek(7);
-          setAvailability([{ day_of_week: 0, start_time: "", end_time: "", is_full_day: false }]);
+          setDayPlans(buildEmptyDayPlans());
         }
       } else {
         const availabilityResponse = await API.get<AvailabilityApiRow[]>("/availability");
-        setAvailability(mapApiAvailabilityToForm(availabilityResponse.data ?? [], BUSINESS_OPEN, BUSINESS_CLOSE));
+        setDayPlans(mapApiAvailabilityToDayPlans(availabilityResponse.data ?? []));
       }
     } catch (err: unknown) {
       console.error(err);
@@ -509,64 +607,78 @@ export default function UserAvailabilityForm() {
 
             <section className="availability-form__availability">
               <div className="availability-form__availability-head">
-                <h3>Availability Blocks</h3>
-                <button type="button" onClick={addAvailability} className="availability-form__add-button">
-                  + Add Availability
-                </button>
+                <h3>Weekly Availability</h3>
               </div>
 
-              <div className="availability-form__rows">
-                {availability.map((av, i) => (
-                  <div key={i} className="availability-row">
-                    <label className="availability-row__field">
-                      <span>Day</span>
-                      <select
-                        value={av.day_of_week}
-                        onChange={e => updateAvailability(i, "day_of_week", +e.target.value)}
-                      >
-                        {days.map((day, idx) => (
-                          <option key={idx} value={idx}>{day}</option>
+              <div className="availability-form__week-grid">
+                {dayPlans.map(plan => (
+                  <article key={plan.day_of_week} className="availability-day-card">
+                    <header className="availability-day-card__head">
+                      <h4>{DAYS[plan.day_of_week]}</h4>
+                      <div className="availability-day-card__modes">
+                        <button
+                          type="button"
+                          className={`availability-day-card__mode${plan.mode === "full" ? " availability-day-card__mode--active" : ""}`}
+                          onClick={() => updateDayMode(plan.day_of_week, "full")}
+                        >
+                          Fully Available
+                        </button>
+                        <button
+                          type="button"
+                          className={`availability-day-card__mode${plan.mode === "unavailable" ? " availability-day-card__mode--active" : ""}`}
+                          onClick={() => updateDayMode(plan.day_of_week, "unavailable")}
+                        >
+                          Not Available
+                        </button>
+                        <button
+                          type="button"
+                          className={`availability-day-card__mode${plan.mode === "custom" ? " availability-day-card__mode--active" : ""}`}
+                          onClick={() => updateDayMode(plan.day_of_week, "custom")}
+                        >
+                          Custom Times
+                        </button>
+                      </div>
+                    </header>
+
+                    {plan.mode === "custom" && (
+                      <div className="availability-day-card__blocks">
+                        {plan.blocks.map((block, blockIndex) => (
+                          <div key={`${plan.day_of_week}-${blockIndex}`} className="availability-day-card__block">
+                            <label>
+                              <span>Start</span>
+                              <input
+                                type="time"
+                                value={block.start_time}
+                                onChange={e => updateBlock(plan.day_of_week, blockIndex, "start_time", e.target.value)}
+                              />
+                            </label>
+                            <label>
+                              <span>End</span>
+                              <input
+                                type="time"
+                                value={block.end_time}
+                                onChange={e => updateBlock(plan.day_of_week, blockIndex, "end_time", e.target.value)}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => removeBlock(plan.day_of_week, blockIndex)}
+                              disabled={plan.blocks.length <= 1}
+                            >
+                              Remove
+                            </button>
+                          </div>
                         ))}
-                      </select>
-                    </label>
-
-                    <label className="availability-row__toggle">
-                      <input
-                        type="checkbox"
-                        checked={av.is_full_day}
-                        onChange={e => toggleFullDayAvailability(i, e.target.checked)}
-                      />
-                      Fully Available
-                    </label>
-
-                    <label className="availability-row__field">
-                      <span>Start</span>
-                      <input
-                        type="time"
-                        value={av.start_time}
-                        onChange={e => updateAvailability(i, "start_time", e.target.value)}
-                        required
-                        disabled={av.is_full_day}
-                      />
-                    </label>
-
-                    <label className="availability-row__field">
-                      <span>End</span>
-                      <input
-                        type="time"
-                        value={av.end_time}
-                        onChange={e => updateAvailability(i, "end_time", e.target.value)}
-                        required
-                        disabled={av.is_full_day}
-                      />
-                    </label>
-
-                    {availability.length > 1 && (
-                      <button type="button" onClick={() => removeAvailability(i)} className="availability-row__remove">
-                        Remove
-                      </button>
+                        <button
+                          type="button"
+                          className="availability-day-card__add"
+                          onClick={() => addExtraBlock(plan.day_of_week)}
+                        >
+                          + Add Extra Block
+                        </button>
+                      </div>
                     )}
-                  </div>
+                  </article>
                 ))}
               </div>
             </section>
