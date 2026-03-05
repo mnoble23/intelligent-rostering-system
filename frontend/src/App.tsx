@@ -216,22 +216,52 @@ export default function App() {
   const navItems =
     role === "manager"
       ? [
-          { to: "/", label: "Roster Dashboard" },
-          { to: "/shift-coverage", label: "Shift Coverage" },
-          { to: "/workplace-constraints", label: "Workplace Constraints" },
-          { to: "/generate-roster", label: "Generate Roster" },
-          { to: "/manage-shifts", label: "Manage Shifts" },
-          { to: "/delete-roster-week", label: "Delete Roster Week" },
-          { to: "/remove-user", label: "Remove User" },
-          { to: "/submit-availability", label: "Submit Availability" },
-          { to: "/my-roster", label: "My Roster" },
-          { to: "/my-profile", label: "My Profile" },
+          {
+            heading: "Roster Ops",
+            items: [
+              { to: "/", label: "Roster Dashboard" },
+              { to: "/generate-roster", label: "Generate Roster" },
+              { to: "/manage-shifts", label: "Manage Shifts" },
+              { to: "/delete-roster-week", label: "Delete Roster Week" },
+            ],
+          },
+          {
+            heading: "Coverage & Rules",
+            items: [
+              { to: "/shift-coverage", label: "Shift Coverage" },
+              { to: "/workplace-constraints", label: "Workplace Constraints" },
+            ],
+          },
+          {
+            heading: "Team",
+            items: [
+              { to: "/submit-availability", label: "Submit Availability" },
+              { to: "/remove-user", label: "Remove User" },
+            ],
+          },
+          {
+            heading: "My Workspace",
+            items: [
+              { to: "/my-roster", label: "My Roster" },
+              { to: "/my-profile", label: "My Profile" },
+            ],
+          },
         ]
       : [
-          { to: "/", label: "Roster Dashboard" },
-          { to: "/my-roster", label: "My Roster" },
-          { to: "/my-profile", label: "My Profile" },
-          { to: "/submit-availability", label: "Submit Availability" },
+          {
+            heading: "Roster",
+            items: [
+              { to: "/", label: "Roster Dashboard" },
+              { to: "/my-roster", label: "My Roster" },
+            ],
+          },
+          {
+            heading: "My Account",
+            items: [
+              { to: "/my-profile", label: "My Profile" },
+              { to: "/submit-availability", label: "Submit Availability" },
+            ],
+          },
         ];
 
   return (
@@ -243,14 +273,21 @@ export default function App() {
             <p>{role === "manager" ? "Manager workspace" : "Staff workspace"}</p>
           </div>
           <nav className="app-sidebar__links">
-            {navItems.map(item => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) => `app-sidebar__link${isActive ? " app-sidebar__link--active" : ""}`}
-              >
-                {item.label}
-              </NavLink>
+            {navItems.map(section => (
+              <section key={section.heading} className="app-sidebar__section">
+                <p className="app-sidebar__section-title">{section.heading}</p>
+                <div className="app-sidebar__section-links">
+                  {section.items.map(item => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      className={({ isActive }) => `app-sidebar__link${isActive ? " app-sidebar__link--active" : ""}`}
+                    >
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              </section>
             ))}
           </nav>
           <div className="app-sidebar__week-picker">

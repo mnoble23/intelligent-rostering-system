@@ -28,6 +28,26 @@
 
 .app-sidebar__links {
   display: grid;
+  gap: 12px;
+}
+
+.app-sidebar__section {
+  display: grid;
+  gap: 6px;
+}
+
+.app-sidebar__section-title {
+  color: #8ea8c0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin: 0;
+  padding: 2px 2px 0;
+  text-transform: uppercase;
+}
+
+.app-sidebar__section-links {
+  display: grid;
   gap: 6px;
 }
 
@@ -128,6 +148,21 @@
   }
 
   .app-sidebar__links {
+    display: grid;
+    gap: 8px;
+  }
+
+  .app-sidebar__section {
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-top: 8px;
+  }
+
+  .app-sidebar__section:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .app-sidebar__section-links {
     display: flex;
     gap: 8px;
     overflow-x: auto;
