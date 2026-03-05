@@ -77,6 +77,12 @@
   margin-top: auto;
 }
 
+.app-sidebar__top-actions {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  margin-bottom: 2px;
+  padding-bottom: 10px;
+}
+
 .app-sidebar__week-picker {
   display: grid;
   gap: 6px;
@@ -181,6 +187,12 @@
 
   .app-sidebar__footer {
     margin-top: 2px;
+  }
+
+  .app-sidebar__top-actions {
+    border-bottom: 0;
+    margin-bottom: 0;
+    padding-bottom: 2px;
   }
 
   .app-sidebar__week-picker select {

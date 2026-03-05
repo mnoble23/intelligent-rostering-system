@@ -272,6 +272,11 @@ export default function App() {
             <h1>Roster OS</h1>
             <p>{role === "manager" ? "Manager workspace" : "Staff workspace"}</p>
           </div>
+          <div className="app-sidebar__top-actions">
+            <button type="button" className="app-sidebar__switch" onClick={clearAuth}>
+              Sign Out
+            </button>
+          </div>
           <nav className="app-sidebar__links">
             {navItems.map(section => (
               <section key={section.heading} className="app-sidebar__section">
@@ -308,11 +313,6 @@ export default function App() {
                 ))
               )}
             </select>
-          </div>
-          <div className="app-sidebar__footer">
-            <button type="button" className="app-sidebar__switch" onClick={clearAuth}>
-              Sign Out
-            </button>
           </div>
         </aside>
 
