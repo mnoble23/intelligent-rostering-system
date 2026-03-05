@@ -45,6 +45,28 @@ function toHHMM(value: string) {
   return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
 }
 
+function mapApiAvailabilityToForm(rows: AvailabilityApiRow[], businessOpen: string, businessClose: string): Availability[] {
+  const mapped = rows
+    .sort((a, b) => {
+      if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
+      return a.start_time.localeCompare(b.start_time);
+    })
+    .map(row => {
+      const start = toHHMM(row.start_time);
+      const end = toHHMM(row.end_time);
+      return {
+        day_of_week: row.day_of_week,
+        start_time: start,
+        end_time: end,
+        is_full_day: start === businessOpen && end === businessClose,
+      };
+    });
+
+  return mapped.length > 0
+    ? mapped
+    : [{ day_of_week: 0, start_time: "", end_time: "", is_full_day: false }];
+}
+
 export default function UserAvailabilityForm() {
   const BUSINESS_OPEN = "06:00";
   const BUSINESS_CLOSE = "22:00";
@@ -78,6 +100,8 @@ export default function UserAvailabilityForm() {
         if (meResponse.data.role === "staff") {
           setName(meResponse.data.name);
           setRole("staff");
+          const availabilityResponse = await API.get<AvailabilityApiRow[]>("/availability");
+          setAvailability(mapApiAvailabilityToForm(availabilityResponse.data ?? [], BUSINESS_OPEN, BUSINESS_CLOSE));
           return;
         }
 
@@ -136,28 +160,8 @@ export default function UserAvailabilityForm() {
     setMinShiftsPerWeek(selectedUser.min_shifts_per_week);
     setMaxShiftsPerWeek(selectedUser.max_shifts_per_week);
 
-    const selectedAvailability = availabilityRows
-      .filter(row => row.user_id === selectedUser.id)
-      .sort((a, b) => {
-        if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
-        return a.start_time.localeCompare(b.start_time);
-      })
-      .map(row => {
-        const start = toHHMM(row.start_time);
-        const end = toHHMM(row.end_time);
-        return {
-          day_of_week: row.day_of_week,
-          start_time: start,
-          end_time: end,
-          is_full_day: start === BUSINESS_OPEN && end === BUSINESS_CLOSE,
-        };
-      });
-
-    setAvailability(
-      selectedAvailability.length > 0
-        ? selectedAvailability
-        : [{ day_of_week: 0, start_time: "", end_time: "", is_full_day: false }]
-    );
+    const selectedAvailability = availabilityRows.filter(row => row.user_id === selectedUser.id);
+    setAvailability(mapApiAvailabilityToForm(selectedAvailability, BUSINESS_OPEN, BUSINESS_CLOSE));
   }, [authUser?.role, managerMode, selectedExistingUserId, managerUsers, availabilityRows, BUSINESS_OPEN, BUSINESS_CLOSE]);
 
   const addAvailability = () => {
@@ -324,7 +328,8 @@ export default function UserAvailabilityForm() {
           setAvailability([{ day_of_week: 0, start_time: "", end_time: "", is_full_day: false }]);
         }
       } else {
-        setAvailability([{ day_of_week: 0, start_time: "", end_time: "", is_full_day: false }]);
+        const availabilityResponse = await API.get<AvailabilityApiRow[]>("/availability");
+        setAvailability(mapApiAvailabilityToForm(availabilityResponse.data ?? [], BUSINESS_OPEN, BUSINESS_CLOSE));
       }
     } catch (err: unknown) {
       console.error(err);
