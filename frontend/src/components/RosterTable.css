@@ -110,6 +110,15 @@
   cursor: pointer;
 }
 
+.employee-calendar__table tbody td.employee-calendar__cell--editable:hover {
+  background: #f3f9ff;
+}
+
+.employee-calendar__table tbody td.employee-calendar__cell--editable:focus-visible {
+  box-shadow: inset 0 0 0 2px #75b8ec;
+  outline: none;
+}
+
 .employee-calendar__table tbody td[data-selected="true"] {
   background: #eef8ff;
 }

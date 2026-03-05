@@ -152,27 +152,23 @@ export default function RosterTable({
                         key={cellKey}
                         className={editable ? "employee-calendar__cell--editable" : undefined}
                         data-selected={isSelected ? "true" : "false"}
+                        onClick={editable ? () => onCellClick?.(employee.id, dayIndex) : undefined}
+                        onKeyDown={editable ? event => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            onCellClick?.(employee.id, dayIndex);
+                          }
+                        } : undefined}
+                        role={editable ? "button" : undefined}
+                        tabIndex={editable ? 0 : undefined}
                       >
                         {isSelected && (
                           <div className="employee-calendar__actions">{renderCellActions?.(employee.id, dayIndex)}</div>
                         )}
                         {dayAssignments.length === 0 ? (
-                          editable ? (
-                            <button
-                              type="button"
-                              className="employee-calendar__off employee-calendar__cell-button"
-                              onClick={() => onCellClick?.(employee.id, dayIndex)}
-                            >
-                              Off
-                            </button>
-                          ) : (
-                            <span className="employee-calendar__off">Off</span>
-                          )
+                          <span className="employee-calendar__off">Off</span>
                         ) : (
-                          <ul
-                            className={`employee-calendar__shift-list ${editable ? "employee-calendar__cell-button-wrap" : ""}`}
-                            onClick={editable ? () => onCellClick?.(employee.id, dayIndex) : undefined}
-                          >
+                          <ul className="employee-calendar__shift-list">
                             {dayAssignments.map((shiftTime, idx) => (
                               <li key={`${cellKey}-${idx}`} className="employee-calendar__shift-pill">
                                 {shiftTime.label}
