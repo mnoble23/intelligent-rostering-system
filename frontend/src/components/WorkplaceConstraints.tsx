@@ -8,6 +8,8 @@ interface WorkplaceConstraintsResponse {
   min_managers_per_hour: number;
   max_consecutive_shifts: number;
   min_hours_between_shifts: number;
+  business_start_hour: number;
+  business_end_hour: number;
 }
 
 function validateConstraints(values: WorkplaceConstraintsResponse) {
@@ -16,6 +18,8 @@ function validateConstraints(values: WorkplaceConstraintsResponse) {
     values.min_managers_per_hour,
     values.max_consecutive_shifts,
     values.min_hours_between_shifts,
+    values.business_start_hour,
+    values.business_end_hour,
   ];
 
   if (fields.some(value => !Number.isFinite(value))) {
@@ -38,6 +42,15 @@ function validateConstraints(values: WorkplaceConstraintsResponse) {
   }
   if (values.min_managers_per_hour > values.min_staff_per_shift) {
     return "Min managers per hour cannot exceed min staff per shift.";
+  }
+  if (values.business_start_hour < 0 || values.business_start_hour > 23) {
+    return "Business start hour must be between 0 and 23.";
+  }
+  if (values.business_end_hour < 1 || values.business_end_hour > 24) {
+    return "Business end hour must be between 1 and 24.";
+  }
+  if (values.business_end_hour <= values.business_start_hour) {
+    return "Business end hour must be later than business start hour.";
   }
 
   return null;
@@ -78,7 +91,13 @@ export default function WorkplaceConstraints() {
   }, []);
 
   const updateConstraint = (
-    field: "min_staff_per_shift" | "min_managers_per_hour" | "max_consecutive_shifts" | "min_hours_between_shifts",
+    field:
+      | "min_staff_per_shift"
+      | "min_managers_per_hour"
+      | "max_consecutive_shifts"
+      | "min_hours_between_shifts"
+      | "business_start_hour"
+      | "business_end_hour",
     value: number
   ) => {
     setConstraints(current => {
@@ -104,6 +123,8 @@ export default function WorkplaceConstraints() {
         min_managers_per_hour: constraints.min_managers_per_hour,
         max_consecutive_shifts: constraints.max_consecutive_shifts,
         min_hours_between_shifts: constraints.min_hours_between_shifts,
+        business_start_hour: constraints.business_start_hour,
+        business_end_hour: constraints.business_end_hour,
       });
       setConstraints(response.data);
       setStatus("Constraints saved.");
@@ -114,11 +135,24 @@ export default function WorkplaceConstraints() {
         fallbackMessage: "Failed to save workplace constraints.",
         detailMap: {
           "min_managers_per_hour cannot exceed min_staff_per_shift": "Min managers per hour cannot exceed min staff per shift.",
+          "business_end_hour must be later than business_start_hour": "Business end hour must be later than business start hour.",
         },
       }));
       setStatusType("error");
     }
   };
+
+  const startHourOptions = Array.from({ length: 24 }, (_, hour) => ({
+    value: hour,
+    label: `${String(hour).padStart(2, "0")}:00`,
+  }));
+  const endHourOptions = Array.from({ length: 24 }, (_, index) => {
+    const hour = index + 1;
+    return {
+      value: hour,
+      label: `${String(hour).padStart(2, "0")}:00`,
+    };
+  });
 
   return (
     <section className="workplace-constraints">
@@ -176,6 +210,36 @@ export default function WorkplaceConstraints() {
               onChange={event => updateConstraint("min_hours_between_shifts", Number(event.target.value))}
               disabled={!constraints || statusType === "loading"}
             />
+          </label>
+
+          <label className="workplace-constraints__field">
+            <span>Business start hour</span>
+            <select
+              value={constraints?.business_start_hour ?? 6}
+              onChange={event => updateConstraint("business_start_hour", Number(event.target.value))}
+              disabled={!constraints || statusType === "loading"}
+            >
+              {startHourOptions.map(option => (
+                <option key={`start-${option.value}`} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="workplace-constraints__field">
+            <span>Business end hour</span>
+            <select
+              value={constraints?.business_end_hour ?? 22}
+              onChange={event => updateConstraint("business_end_hour", Number(event.target.value))}
+              disabled={!constraints || statusType === "loading"}
+            >
+              {endHourOptions.map(option => (
+                <option key={`end-${option.value}`} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
 
           <button type="button" className="workplace-constraints__save" onClick={handleSave} disabled={!constraints || statusType === "loading"}>
