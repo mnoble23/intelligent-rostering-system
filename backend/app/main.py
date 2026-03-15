@@ -302,6 +302,96 @@ with engine.begin() as connection:
             text('ALTER TABLE "shift_assignment" ALTER COLUMN workplace_id SET NOT NULL')
         )
 
+    # Data integrity and performance improvements.
+    # Deduplicate rows before creating unique indexes to avoid startup failures.
+    connection.execute(
+        text(
+            'WITH ranked AS ('
+            '  SELECT ctid, ROW_NUMBER() OVER ('
+            '    PARTITION BY shift_id, user_id ORDER BY id'
+            '  ) AS rn '
+            '  FROM shift_assignment'
+            ') '
+            'DELETE FROM shift_assignment '
+            'WHERE ctid IN (SELECT ctid FROM ranked WHERE rn > 1)'
+        )
+    )
+    connection.execute(
+        text(
+            'WITH ranked AS ('
+            '  SELECT ctid, ROW_NUMBER() OVER ('
+            '    PARTITION BY workplace_id, week_start_date, day_of_week, start_time, end_time '
+            '    ORDER BY id'
+            '  ) AS rn '
+            '  FROM shift'
+            ') '
+            'DELETE FROM shift '
+            'WHERE ctid IN (SELECT ctid FROM ranked WHERE rn > 1)'
+        )
+    )
+    connection.execute(
+        text(
+            'WITH ranked AS ('
+            '  SELECT ctid, ROW_NUMBER() OVER ('
+            '    PARTITION BY user_id, day_of_week, start_time, end_time '
+            '    ORDER BY id'
+            '  ) AS rn '
+            '  FROM availability'
+            ') '
+            'DELETE FROM availability '
+            'WHERE ctid IN (SELECT ctid FROM ranked WHERE rn > 1)'
+        )
+    )
+
+    # Unique indexes to enforce no duplicate rows for key entities.
+    connection.execute(
+        text(
+            'CREATE UNIQUE INDEX IF NOT EXISTS '
+            'ux_shift_assignment_shift_id_user_id '
+            'ON shift_assignment (shift_id, user_id)'
+        )
+    )
+    connection.execute(
+        text(
+            'CREATE UNIQUE INDEX IF NOT EXISTS '
+            'ux_shift_workplace_week_day_time '
+            'ON shift (workplace_id, week_start_date, day_of_week, start_time, end_time)'
+        )
+    )
+    connection.execute(
+        text(
+            'CREATE UNIQUE INDEX IF NOT EXISTS '
+            'ux_availability_user_day_time '
+            'ON availability (user_id, day_of_week, start_time, end_time)'
+        )
+    )
+
+    # Indexes to improve common lookups.
+    connection.execute(
+        text(
+            'CREATE INDEX IF NOT EXISTS ix_user_workplace_id '
+            'ON "user" (workplace_id)'
+        )
+    )
+    connection.execute(
+        text(
+            'CREATE INDEX IF NOT EXISTS ix_availability_user_id '
+            'ON availability (user_id)'
+        )
+    )
+    connection.execute(
+        text(
+            'CREATE INDEX IF NOT EXISTS ix_shift_assignment_user_id '
+            'ON shift_assignment (user_id)'
+        )
+    )
+    connection.execute(
+        text(
+            'CREATE INDEX IF NOT EXISTS ix_shift_assignment_shift_id '
+            'ON shift_assignment (shift_id)'
+        )
+    )
+
 
 app = FastAPI()
 cors_origins = get_cors_origins()
