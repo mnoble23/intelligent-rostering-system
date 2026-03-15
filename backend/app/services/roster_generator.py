@@ -46,23 +46,32 @@ class Shift:
     day_of_week: int
     start_time: time
     end_time: time
+    start_hour: int
+    end_hour: int
     staff: List[int] = field(default_factory=list)
 
 
-def generate_weekly_shifts(week_start_date: date) -> Dict[int, List[Shift]]:
+def generate_weekly_shifts(
+    week_start_date: date,
+    business_start_hour: int = BUSINESS_START,
+    business_end_hour: int = BUSINESS_END,
+) -> Dict[int, List[Shift]]:
     weekly_shifts: Dict[int, List[Shift]] = {}
     for day in range(7):
         shifts: List[Shift] = []
-        for start_hour in range(BUSINESS_START, BUSINESS_END):
+        for start_hour in range(business_start_hour, business_end_hour):
             for duration_hours in ALLOWED_SHIFT_HOURS:
                 end_hour = start_hour + duration_hours
-                if end_hour > BUSINESS_END:
+                if end_hour > business_end_hour:
                     continue
+                shift_end_time = time(hour=23, minute=59) if end_hour == 24 else time(hour=end_hour)
                 shift = Shift(
                     week_start_date=week_start_date,
                     day_of_week=day,
                     start_time=time(hour=start_hour),
-                    end_time=time(hour=end_hour),
+                    end_time=shift_end_time,
+                    start_hour=start_hour,
+                    end_hour=end_hour,
                 )
                 shifts.append(shift)
         weekly_shifts[day] = shifts
@@ -107,12 +116,11 @@ def assign_staff_to_shifts(
     min_managers_per_hour: int = MIN_MANAGERS_PER_HOUR,
     max_consecutive_shifts: int = MAX_CONSECUTIVE_SHIFTS,
     min_hours_between_shifts: int = MIN_HOURS_BETWEEN_SHIFTS,
+    business_start_hour: int = BUSINESS_START,
+    business_end_hour: int = BUSINESS_END,
 ) -> Dict[int, List[Shift]]:
     def shift_duration_hours(shift: Shift) -> float:
-        return (
-            (shift.end_time.hour * 60 + shift.end_time.minute)
-            - (shift.start_time.hour * 60 + shift.start_time.minute)
-        ) / 60.0
+        return (shift.end_hour - shift.start_hour)
 
     user_hour_limits = user_hour_limits or {}
     user_shift_limits = user_shift_limits or {}
@@ -151,10 +159,10 @@ def assign_staff_to_shifts(
         )
         ordered_shifts_by_day[day] = ordered_shifts
         hourly_assigned_staff_by_day[day] = {
-            hour: 0 for hour in range(BUSINESS_START, BUSINESS_END)
+            hour: 0 for hour in range(business_start_hour, business_end_hour)
         }
         hourly_assigned_managers_by_day[day] = {
-            hour: 0 for hour in range(BUSINESS_START, BUSINESS_END)
+            hour: 0 for hour in range(business_start_hour, business_end_hour)
         }
         for shift in ordered_shifts:
             shift_id = id(shift)
@@ -166,7 +174,10 @@ def assign_staff_to_shifts(
     def shift_datetimes(shift: Shift) -> tuple[datetime, datetime]:
         shift_date = week_start_date + timedelta(days=shift.day_of_week)
         start_dt = datetime.combine(shift_date, shift.start_time)
-        end_dt = datetime.combine(shift_date, shift.end_time)
+        if shift.end_hour == 24:
+            end_dt = datetime.combine(shift_date + timedelta(days=1), time(0, 0))
+        else:
+            end_dt = datetime.combine(shift_date, shift.end_time)
         return start_dt, end_dt
 
     def would_exceed_max_consecutive_shifts(user_id: int, candidate_day: int) -> bool:
@@ -247,7 +258,7 @@ def assign_staff_to_shifts(
         user_daily_assignments.setdefault(user_id, {}).setdefault(day, []).append(shift)
         user_assigned_hours[user_id] = user_assigned_hours.get(user_id, 0.0) + duration_hours
         user_assigned_shift_counts[user_id] = user_assigned_shift_counts.get(user_id, 0) + 1
-        for hour in range(shift.start_time.hour, shift.end_time.hour):
+        for hour in range(shift.start_hour, shift.end_hour):
             hourly_assigned_staff_by_day[day][hour] += 1
             if is_manager(user_id):
                 hourly_assigned_managers_by_day[day][hour] += 1
@@ -290,7 +301,7 @@ def assign_staff_to_shifts(
 
                     manager_coverage_gain = sum(
                         1
-                        for hour in range(shift.start_time.hour, shift.end_time.hour)
+                        for hour in range(shift.start_hour, shift.end_hour)
                         if hourly_assigned_managers[hour] < min_managers_per_hour
                     )
                     if manager_coverage_gain <= 0:
@@ -377,7 +388,7 @@ def assign_staff_to_shifts(
 
                     coverage_gain = sum(
                         1
-                        for hour in range(shift.start_time.hour, shift.end_time.hour)
+                        for hour in range(shift.start_hour, shift.end_hour)
                         if hourly_assigned_staff[hour] < min_staff_per_shift
                     )
                     if coverage_gain <= 0:
@@ -457,7 +468,7 @@ def assign_staff_to_shifts(
                     duration_hours = shift_duration_hours(shift)
                     coverage_gain = sum(
                         1
-                        for hour in range(shift.start_time.hour, shift.end_time.hour)
+                        for hour in range(shift.start_hour, shift.end_hour)
                         if hourly_assigned_staff_by_day[day][hour] < min_staff_per_shift
                     )
                     score = (
@@ -534,7 +545,7 @@ def assign_staff_to_shifts(
 
     uncovered_manager_hours: List[Tuple[int, int]] = []
     for day in range(7):
-        for hour in range(BUSINESS_START, BUSINESS_END):
+        for hour in range(business_start_hour, business_end_hour):
             if hourly_assigned_managers_by_day[day][hour] < min_managers_per_hour:
                 uncovered_manager_hours.append((day, hour))
     if uncovered_manager_hours:
@@ -559,7 +570,7 @@ def assign_staff_to_shifts(
 
     uncovered_staff_hours: List[Tuple[int, int]] = []
     for day in range(7):
-        for hour in range(BUSINESS_START, BUSINESS_END):
+        for hour in range(business_start_hour, business_end_hour):
             if hourly_assigned_staff_by_day[day][hour] < min_staff_per_shift:
                 uncovered_staff_hours.append((day, hour))
     if uncovered_staff_hours:

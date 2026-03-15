@@ -19,6 +19,8 @@ class WorkplaceConstraintsResponse(BaseModel):
     min_managers_per_hour: int = Field(ge=0, le=10)
     max_consecutive_shifts: int = Field(ge=1, le=7)
     min_hours_between_shifts: int = Field(ge=0, le=24)
+    business_start_hour: int = Field(ge=0, le=23)
+    business_end_hour: int = Field(ge=1, le=24)
 
 
 class UpdateWorkplaceConstraintsRequest(BaseModel):
@@ -26,6 +28,8 @@ class UpdateWorkplaceConstraintsRequest(BaseModel):
     min_managers_per_hour: int = Field(ge=0, le=10)
     max_consecutive_shifts: int = Field(ge=1, le=7)
     min_hours_between_shifts: int = Field(ge=0, le=24)
+    business_start_hour: int = Field(ge=0, le=23)
+    business_end_hour: int = Field(ge=1, le=24)
 
 
 @router.get("/constraints", response_model=WorkplaceConstraintsResponse)
@@ -43,6 +47,8 @@ def get_workplace_constraints(
         "min_managers_per_hour": workplace.min_managers_per_hour,
         "max_consecutive_shifts": workplace.max_consecutive_shifts,
         "min_hours_between_shifts": workplace.min_hours_between_shifts,
+        "business_start_hour": workplace.business_start_hour,
+        "business_end_hour": workplace.business_end_hour,
     }
 
 
@@ -57,6 +63,11 @@ def update_workplace_constraints(
             status_code=400,
             detail="min_managers_per_hour cannot exceed min_staff_per_shift",
         )
+    if payload.business_end_hour <= payload.business_start_hour:
+        raise HTTPException(
+            status_code=400,
+            detail="business_end_hour must be later than business_start_hour",
+        )
 
     workplace = db.query(WorkplaceDB).filter_by(id=current_user.workplace_id).first()
     if not workplace:
@@ -66,6 +77,8 @@ def update_workplace_constraints(
     workplace.min_managers_per_hour = payload.min_managers_per_hour
     workplace.max_consecutive_shifts = payload.max_consecutive_shifts
     workplace.min_hours_between_shifts = payload.min_hours_between_shifts
+    workplace.business_start_hour = payload.business_start_hour
+    workplace.business_end_hour = payload.business_end_hour
     db.commit()
     db.refresh(workplace)
 
@@ -75,4 +88,6 @@ def update_workplace_constraints(
         "min_managers_per_hour": workplace.min_managers_per_hour,
         "max_consecutive_shifts": workplace.max_consecutive_shifts,
         "min_hours_between_shifts": workplace.min_hours_between_shifts,
+        "business_start_hour": workplace.business_start_hour,
+        "business_end_hour": workplace.business_end_hour,
     }
