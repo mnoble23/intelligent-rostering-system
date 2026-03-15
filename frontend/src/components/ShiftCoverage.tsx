@@ -48,7 +48,8 @@ function formatDayLabel(dayIndex: number, weekStartDate?: string) {
 
 function formatHourLabel(hourStr: string) {
   const [hourRaw] = hourStr.split(":");
-  const hour = Number(hourRaw);
+  const parsed = Number(hourRaw);
+  const hour = parsed === 24 ? 0 : parsed;
   const suffix = hour >= 12 ? "PM" : "AM";
   const hour12 = hour % 12 || 12;
   return `${hour12}:00 ${suffix}`;
