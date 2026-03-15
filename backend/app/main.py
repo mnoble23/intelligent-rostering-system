@@ -166,6 +166,40 @@ with engine.begin() as connection:
         connection.execute(
             text('ALTER TABLE "workplace" ALTER COLUMN min_hours_between_shifts SET DEFAULT 11')
         )
+    if "business_start_hour" not in workplace_columns:
+        connection.execute(
+            text('ALTER TABLE "workplace" ADD COLUMN business_start_hour INTEGER')
+        )
+        connection.execute(
+            text('UPDATE "workplace" SET business_start_hour = 6 WHERE business_start_hour IS NULL')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN business_start_hour SET DEFAULT 6')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN business_start_hour SET NOT NULL')
+        )
+    if "business_start_hour" in workplace_columns:
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN business_start_hour SET DEFAULT 6')
+        )
+    if "business_end_hour" not in workplace_columns:
+        connection.execute(
+            text('ALTER TABLE "workplace" ADD COLUMN business_end_hour INTEGER')
+        )
+        connection.execute(
+            text('UPDATE "workplace" SET business_end_hour = 22 WHERE business_end_hour IS NULL')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN business_end_hour SET DEFAULT 22')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN business_end_hour SET NOT NULL')
+        )
+    if "business_end_hour" in workplace_columns:
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN business_end_hour SET DEFAULT 22')
+        )
 
     default_workplace_row = connection.execute(
         text('SELECT id FROM workplace ORDER BY id LIMIT 1')
