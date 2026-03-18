@@ -7,11 +7,6 @@ from sqlalchemy.orm import Session
 from app.models.shift_assignment_db import ShiftAssignmentDB
 from app.models.shift_db import ShiftDB
 
-try:
-    from ortools.sat.python import cp_model
-except ImportError:  # pragma: no cover - exercised in environments without OR-Tools.
-    cp_model = None
-
 WeeklyAvailability = Dict[int, Dict[int, List[Tuple[time, time]]]]
 UserHourLimits = Dict[int, Tuple[float, float]]
 UserShiftLimits = Dict[int, Tuple[int, int]]
@@ -44,6 +39,14 @@ class RosterGenerationError(ValueError):
         self.explanation = explanation
         self.suggestions = suggestions or []
         self.context = context or {}
+
+
+def _load_cp_model():
+    try:
+        from ortools.sat.python import cp_model as ortools_cp_model
+    except ImportError:  # pragma: no cover - exercised in environments without OR-Tools.
+        return None
+    return ortools_cp_model
 
 
 @dataclass
@@ -125,6 +128,7 @@ def assign_staff_to_shifts(
     business_start_hour: int = BUSINESS_START,
     business_end_hour: int = BUSINESS_END,
 ) -> Dict[int, List[Shift]]:
+    cp_model = _load_cp_model()
     if cp_model is None:
         raise RosterGenerationError(
             code="solver_unavailable",
