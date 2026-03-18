@@ -1,11 +1,12 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from sqlalchemy.orm import Session
 
 from app.models.shift_assignment_db import ShiftAssignmentDB
 from app.models.shift_db import ShiftDB
+from app.models.user_db import UserDB
 
 WeeklyAvailability = Dict[int, Dict[int, List[Tuple[time, time]]]]
 UserHourLimits = Dict[int, Tuple[float, float]]
@@ -41,12 +42,29 @@ class RosterGenerationError(ValueError):
         self.context = context or {}
 
 
-def _load_cp_model():
+def _load_cp_model() -> Any | None:
     try:
         from ortools.sat.python import cp_model as ortools_cp_model
     except ImportError:  # pragma: no cover - exercised in environments without OR-Tools.
         return None
     return ortools_cp_model
+
+
+def _format_hour_label(hour: int) -> str:
+    return f"{hour:02d}:00"
+
+
+def _format_day_label(day_of_week: int) -> str:
+    day_labels = (
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    )
+    return day_labels[day_of_week]
 
 
 @dataclass
@@ -178,6 +196,15 @@ def assign_staff_to_shifts(
         | set(user_shift_limits)
         | set(user_roles)
     )
+    user_names: Dict[int, str] = {}
+    if users:
+        user_names = {
+            user.id: user.name
+            for user in db.query(UserDB).filter(
+                UserDB.workplace_id == workplace_id,
+                UserDB.id.in_(users),
+            )
+        }
 
     def shift_duration_minutes(shift: Shift) -> int:
         return (shift.end_hour - shift.start_hour) * 60
@@ -204,8 +231,79 @@ def assign_staff_to_shifts(
     def is_manager(user_id: int) -> bool:
         return user_roles.get(user_id, "staff").strip().lower() == MANAGER_ROLE
 
+    def maximize_user_capacity(user_id: int, objective: str) -> int:
+        user_shift_indices = sorted(
+            shift_index
+            for (candidate_user_id, shift_index) in assignment_vars
+            if candidate_user_id == user_id
+        )
+        if not user_shift_indices:
+            return 0
+
+        capacity_model = cp_model.CpModel()
+        capacity_vars = {
+            shift_index: capacity_model.NewBoolVar(f"user_{user_id}_shift_{shift_index}")
+            for shift_index in user_shift_indices
+        }
+
+        for day in range(7):
+            day_vars = [
+                capacity_vars[shift_index]
+                for shift_index in user_shift_indices
+                if all_shifts[shift_index].day_of_week == day
+            ]
+            if day_vars:
+                capacity_model.Add(sum(day_vars) <= 1)
+
+        if 1 <= max_consecutive_shifts < 7:
+            work_day_vars = {}
+            for day in range(7):
+                work_day_var = capacity_model.NewBoolVar(f"user_{user_id}_works_day_{day}")
+                work_day_vars[day] = work_day_var
+                day_vars = [
+                    capacity_vars[shift_index]
+                    for shift_index in user_shift_indices
+                    if all_shifts[shift_index].day_of_week == day
+                ]
+                if day_vars:
+                    capacity_model.Add(sum(day_vars) == work_day_var)
+                else:
+                    capacity_model.Add(work_day_var == 0)
+            for start_day in range(0, 7 - max_consecutive_shifts):
+                capacity_model.Add(
+                    sum(work_day_vars[day] for day in range(start_day, start_day + max_consecutive_shifts + 1))
+                    <= max_consecutive_shifts
+                )
+
+        for left_pos, left_index in enumerate(user_shift_indices):
+            left_shift = all_shifts[left_index]
+            for right_index in user_shift_indices[left_pos + 1:]:
+                right_shift = all_shifts[right_index]
+                if not shifts_have_required_rest(left_shift, right_shift):
+                    capacity_model.Add(capacity_vars[left_index] + capacity_vars[right_index] <= 1)
+
+        if objective == "shifts":
+            capacity_model.Maximize(sum(capacity_vars.values()))
+        else:
+            capacity_model.Maximize(
+                sum(
+                    shift_duration_minutes(all_shifts[shift_index]) * capacity_vars[shift_index]
+                    for shift_index in user_shift_indices
+                )
+            )
+
+        capacity_solver = cp_model.CpSolver()
+        capacity_solver.parameters.max_time_in_seconds = 3.0
+        capacity_solver.parameters.num_search_workers = 8
+        status = capacity_solver.Solve(capacity_model)
+        if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            return 0
+        if objective == "shifts":
+            return int(capacity_solver.ObjectiveValue())
+        return int(capacity_solver.ObjectiveValue())
+
     model = cp_model.CpModel()
-    assignment_vars: Dict[tuple[int, int], cp_model.IntVar] = {}
+    assignment_vars: Dict[tuple[int, int], Any] = {}
 
     for shift in all_shifts:
         shift_index = shift_ids[id(shift)]
@@ -223,6 +321,143 @@ def assign_staff_to_shifts(
                 "Review availability data for time format or overlap issues.",
                 "Check that active users exist in the workplace.",
             ],
+        )
+
+    users_below_possible_min_shifts = []
+    users_below_possible_min_hours = []
+    for user_id in users:
+        min_shifts, _ = user_shift_limits.get(user_id, (0, 7))
+        min_minutes = int(round(user_hour_limits.get(user_id, (0.0, float("inf")))[0] * 60))
+        possible_shifts = maximize_user_capacity(user_id, "shifts")
+        possible_minutes = maximize_user_capacity(user_id, "minutes")
+        if possible_shifts < min_shifts:
+            users_below_possible_min_shifts.append(
+                {
+                    "user_id": user_id,
+                    "user_name": user_names.get(user_id, f"User {user_id}"),
+                    "required_shifts": min_shifts,
+                    "possible_shifts": possible_shifts,
+                }
+            )
+        if possible_minutes < min_minutes:
+            users_below_possible_min_hours.append(
+                {
+                    "user_id": user_id,
+                    "user_name": user_names.get(user_id, f"User {user_id}"),
+                    "required_hours": round(min_minutes / 60, 2),
+                    "possible_hours": round(possible_minutes / 60, 2),
+                }
+            )
+
+    if users_below_possible_min_shifts:
+        users_below_possible_min_shifts.sort(
+            key=lambda item: (item["possible_shifts"] - item["required_shifts"], item["user_id"])
+        )
+        first_user = users_below_possible_min_shifts[0]
+        raise RosterGenerationError(
+            code="min_shifts_unreachable",
+            message="Roster generation failed: one or more users cannot possibly reach their minimum weekly shifts.",
+            explanation="Before solving, the scheduler found users whose feasible shift options are fewer than their minimum weekly shift requirement.",
+            suggestions=[
+                "Increase availability for the affected user.",
+                "Add more shift options that fit the user's available windows.",
+                "Lower the user's minimum weekly shifts if the requirement is incorrect.",
+            ],
+            context={
+                **first_user,
+                "affected_user_ids": ",".join(str(item["user_id"]) for item in users_below_possible_min_shifts[:5]),
+            },
+        )
+
+    if users_below_possible_min_hours:
+        users_below_possible_min_hours.sort(
+            key=lambda item: (item["possible_hours"] - item["required_hours"], item["user_id"])
+        )
+        first_user = users_below_possible_min_hours[0]
+        raise RosterGenerationError(
+            code="min_hours_unreachable",
+            message="Roster generation failed: one or more users cannot possibly reach their minimum weekly hours.",
+            explanation="Before solving, the scheduler found users whose individually feasible shift hours are below their minimum weekly hours.",
+            suggestions=[
+                "Increase availability for the affected user.",
+                "Add shift lengths that better fit the user's available windows.",
+                "Lower the user's minimum weekly hours if the requirement is incorrect.",
+            ],
+            context={
+                **first_user,
+                "affected_user_ids": ",".join(str(item["user_id"]) for item in users_below_possible_min_hours[:5]),
+            },
+        )
+
+    uncovered_staff_hours = []
+    uncovered_manager_hours = []
+    for day in range(7):
+        for hour in range(business_start_hour, business_end_hour):
+            feasible_staff_ids = set()
+            feasible_manager_ids = set()
+            for shift in shifts_by_day[day]:
+                if not (shift.start_hour <= hour < shift.end_hour):
+                    continue
+                for user_id in shift.staff:
+                    feasible_staff_ids.add(user_id)
+                    if is_manager(user_id):
+                        feasible_manager_ids.add(user_id)
+
+            if len(feasible_staff_ids) < min_staff_per_shift:
+                uncovered_staff_hours.append(
+                    {
+                        "day_of_week": day,
+                        "hour": hour,
+                        "required_staff": min_staff_per_shift,
+                        "available_candidates": len(feasible_staff_ids),
+                    }
+                )
+            if len(feasible_manager_ids) < min_managers_per_hour:
+                uncovered_manager_hours.append(
+                    {
+                        "day_of_week": day,
+                        "hour": hour,
+                        "required_managers_per_hour": min_managers_per_hour,
+                        "available_manager_candidates": len(feasible_manager_ids),
+                    }
+                )
+
+    if uncovered_manager_hours:
+        first_gap = uncovered_manager_hours[0]
+        raise RosterGenerationError(
+            code="manager_coverage_unreachable",
+            message="Roster generation failed: one or more hours do not have enough feasible manager coverage.",
+            explanation="Before solving, the scheduler found open hours where the number of available managers is below the required hourly manager target.",
+            suggestions=[
+                "Increase manager availability during the uncovered hours.",
+                "Reduce business hours to periods with manager coverage.",
+                "Lower the minimum managers per hour setting if operationally safe.",
+            ],
+            context={
+                **first_gap,
+                "day_label": _format_day_label(first_gap["day_of_week"]),
+                "hour_label": _format_hour_label(first_gap["hour"]),
+                "uncovered_hours": len(uncovered_manager_hours),
+            },
+        )
+
+    if uncovered_staff_hours:
+        first_gap = uncovered_staff_hours[0]
+        raise RosterGenerationError(
+            code="staff_coverage_unreachable",
+            message="Roster generation failed: one or more hours do not have enough feasible staff coverage.",
+            explanation="Before solving, the scheduler found open hours where the number of available staff candidates is below the required hourly staffing target.",
+            suggestions=[
+                "Increase staff availability during the uncovered hours.",
+                "Reduce business hours to periods with enough staff.",
+                "Lower the minimum staff per shift if service levels allow.",
+            ],
+            context={
+                **first_gap,
+                "day_label": _format_day_label(first_gap["day_of_week"]),
+                "hour_label": _format_hour_label(first_gap["hour"]),
+                "uncovered_hours": len(uncovered_staff_hours),
+            },
         )
 
     for day, day_shifts in shifts_by_day.items():
@@ -278,7 +513,7 @@ def assign_staff_to_shifts(
         model.Add(user_minutes <= max_minutes)
 
     if 1 <= max_consecutive_shifts < 7:
-        work_day_vars: Dict[tuple[int, int], cp_model.IntVar] = {}
+        work_day_vars: Dict[tuple[int, int], Any] = {}
         for user_id in users:
             for day in range(7):
                 day_vars = [
@@ -330,40 +565,6 @@ def assign_staff_to_shifts(
                     staff_covering_vars.append(var)
                     if is_manager(user_id):
                         manager_covering_vars.append(var)
-
-            if len(staff_covering_vars) < min_staff_per_shift:
-                raise RosterGenerationError(
-                    code="staff_coverage_unmet",
-                    message="Roster generation failed: minimum staff coverage could not be met.",
-                    explanation="At least one open hour has too few feasible staff candidates before optimization starts.",
-                    suggestions=[
-                        "Collect more availability for the uncovered period.",
-                        "Reduce minimum staff per shift if service levels allow.",
-                    ],
-                    context={
-                        "day_of_week": day,
-                        "hour": hour,
-                        "required_staff": min_staff_per_shift,
-                        "available_candidates": len(staff_covering_vars),
-                    },
-                )
-
-            if len(manager_covering_vars) < min_managers_per_hour:
-                raise RosterGenerationError(
-                    code="manager_coverage_unmet",
-                    message="Roster generation failed: manager coverage target could not be met.",
-                    explanation="At least one open hour has too few feasible manager candidates before optimization starts.",
-                    suggestions=[
-                        "Increase manager availability for the uncovered period.",
-                        "Lower the minimum managers per hour setting if operationally safe.",
-                    ],
-                    context={
-                        "day_of_week": day,
-                        "hour": hour,
-                        "required_managers_per_hour": min_managers_per_hour,
-                        "available_manager_candidates": len(manager_covering_vars),
-                    },
-                )
 
             model.Add(sum(staff_covering_vars) >= min_staff_per_shift)
             model.Add(sum(manager_covering_vars) >= min_managers_per_hour)
