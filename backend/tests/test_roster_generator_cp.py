@@ -77,10 +77,11 @@ def test_cp_solver_assigns_manager_and_staff_to_cover_open_hours():
     db.refresh(staff)
 
     weekly_availability = {
-        0: {
+        day: {
             manager.id: [(time(9, 0), time(13, 0))],
             staff.id: [(time(9, 0), time(13, 0))],
         }
+        for day in range(7)
     }
     weekly_shifts = generate_weekly_shifts(
         week_start,
@@ -114,13 +115,14 @@ def test_cp_solver_assigns_manager_and_staff_to_cover_open_hours():
         business_end_hour=13,
     )
 
-    assert len(assigned[0]) == 1
-    assert assigned[0][0].start_time == time(9, 0)
-    assert assigned[0][0].end_time == time(13, 0)
-    assert assigned[0][0].staff == [manager.id, staff.id]
+    for day in range(7):
+        assert len(assigned[day]) == 1
+        assert assigned[day][0].start_time == time(9, 0)
+        assert assigned[day][0].end_time == time(13, 0)
+        assert assigned[day][0].staff == [manager.id, staff.id]
 
 
-def test_cp_solver_respects_rest_gap_and_reports_infeasible_roster():
+def test_cp_solver_reports_unreachable_minimum_shifts_when_rest_gap_blocks_second_shift():
     db = _build_session()
     week_start = date(2026, 1, 5)
 
@@ -140,7 +142,7 @@ def test_cp_solver_respects_rest_gap_and_reports_infeasible_roster():
         role="manager",
         min_hours=0,
         max_hours=40,
-        min_shifts_per_week=0,
+        min_shifts_per_week=2,
         max_shifts_per_week=7,
         password_hash="x",
         is_active=True,
@@ -188,13 +190,180 @@ def test_cp_solver_respects_rest_gap_and_reports_infeasible_roster():
             workplace_id=workplace.id,
             min_staff_per_shift=1,
             user_hour_limits={manager.id: (0.0, 40.0)},
-            user_shift_limits={manager.id: (0, 7)},
+            user_shift_limits={manager.id: (2, 7)},
             user_roles={manager.id: "manager"},
-            min_managers_per_hour=1,
+            min_managers_per_hour=0,
             max_consecutive_shifts=7,
             min_hours_between_shifts=11,
             business_start_hour=6,
             business_end_hour=22,
         )
 
-    assert exc_info.value.code == "constraint_model_infeasible"
+    assert exc_info.value.code == "min_shifts_unreachable"
+    assert exc_info.value.context["user_name"] == "solo_manager"
+
+
+def test_cp_solver_reports_user_with_unreachable_minimum_hours():
+    db = _build_session()
+    week_start = date(2026, 1, 5)
+
+    workplace = WorkplaceDB(
+        name="User Minimum Hours Workplace",
+        min_staff_per_shift=1,
+        min_managers_per_hour=1,
+        business_start_hour=9,
+        business_end_hour=13,
+    )
+    db.add(workplace)
+    db.commit()
+    db.refresh(workplace)
+
+    manager = UserDB(
+        name="manager_hours",
+        role="manager",
+        min_hours=0,
+        max_hours=40,
+        min_shifts_per_week=0,
+        max_shifts_per_week=7,
+        password_hash="x",
+        is_active=True,
+        workplace_id=workplace.id,
+    )
+    staff = UserDB(
+        name="staff_hours",
+        role="staff",
+        min_hours=10,
+        max_hours=40,
+        min_shifts_per_week=0,
+        max_shifts_per_week=7,
+        password_hash="x",
+        is_active=True,
+        workplace_id=workplace.id,
+    )
+    db.add_all([manager, staff])
+    db.commit()
+    db.refresh(manager)
+    db.refresh(staff)
+
+    staffable_shifts = {
+        0: [
+            Shift(
+                week_start_date=week_start,
+                day_of_week=0,
+                start_time=time(9, 0),
+                end_time=time(13, 0),
+                start_hour=9,
+                end_hour=13,
+                staff=[manager.id, staff.id],
+            )
+        ],
+        1: [],
+        2: [],
+        3: [],
+        4: [],
+        5: [],
+        6: [],
+    }
+
+    with pytest.raises(RosterGenerationError) as exc_info:
+        assign_staff_to_shifts(
+            db,
+            staffable_shifts,
+            week_start_date=week_start,
+            workplace_id=workplace.id,
+            min_staff_per_shift=1,
+            user_hour_limits={
+                manager.id: (0.0, 40.0),
+                staff.id: (10.0, 40.0),
+            },
+            user_shift_limits={
+                manager.id: (0, 7),
+                staff.id: (0, 7),
+            },
+            user_roles={
+                manager.id: "manager",
+                staff.id: "staff",
+            },
+            min_managers_per_hour=1,
+            max_consecutive_shifts=7,
+            min_hours_between_shifts=11,
+            business_start_hour=9,
+            business_end_hour=13,
+        )
+
+    assert exc_info.value.code == "min_hours_unreachable"
+    assert exc_info.value.context["user_id"] == staff.id
+    assert exc_info.value.context["user_name"] == "staff_hours"
+    assert exc_info.value.context["possible_hours"] == 4.0
+
+
+def test_cp_solver_reports_unreachable_manager_coverage_before_solving():
+    db = _build_session()
+    week_start = date(2026, 1, 5)
+
+    workplace = WorkplaceDB(
+        name="Manager Coverage Workplace",
+        min_staff_per_shift=1,
+        min_managers_per_hour=1,
+        business_start_hour=9,
+        business_end_hour=13,
+    )
+    db.add(workplace)
+    db.commit()
+    db.refresh(workplace)
+
+    staff = UserDB(
+        name="staff_only",
+        role="staff",
+        min_hours=0,
+        max_hours=40,
+        min_shifts_per_week=0,
+        max_shifts_per_week=7,
+        password_hash="x",
+        is_active=True,
+        workplace_id=workplace.id,
+    )
+    db.add(staff)
+    db.commit()
+    db.refresh(staff)
+
+    staffable_shifts = {
+        0: [
+            Shift(
+                week_start_date=week_start,
+                day_of_week=0,
+                start_time=time(9, 0),
+                end_time=time(13, 0),
+                start_hour=9,
+                end_hour=13,
+                staff=[staff.id],
+            )
+        ],
+        1: [],
+        2: [],
+        3: [],
+        4: [],
+        5: [],
+        6: [],
+    }
+
+    with pytest.raises(RosterGenerationError) as exc_info:
+        assign_staff_to_shifts(
+            db,
+            staffable_shifts,
+            week_start_date=week_start,
+            workplace_id=workplace.id,
+            min_staff_per_shift=1,
+            user_hour_limits={staff.id: (0.0, 40.0)},
+            user_shift_limits={staff.id: (0, 7)},
+            user_roles={staff.id: "staff"},
+            min_managers_per_hour=1,
+            max_consecutive_shifts=7,
+            min_hours_between_shifts=11,
+            business_start_hour=9,
+            business_end_hour=13,
+        )
+
+    assert exc_info.value.code == "manager_coverage_unreachable"
+    assert exc_info.value.context["day_of_week"] == 0
+    assert exc_info.value.context["hour"] == 9

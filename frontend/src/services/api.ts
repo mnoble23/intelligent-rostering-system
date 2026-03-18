@@ -106,6 +106,26 @@ function formatObjectDetail(detail: unknown) {
     ) {
       parts.push(`User ${payload.context.user_id} shifts: ${payload.context.assigned_shifts}/${payload.context.required_shifts}.`);
     }
+
+    const userName = typeof payload.context.user_name === "string" ? payload.context.user_name : undefined;
+    const userId = typeof payload.context.user_id === "number" ? payload.context.user_id : undefined;
+    const userLabel = userName ? `"${userName}"` : (typeof userId === "number" ? `User ${userId}` : undefined);
+
+    if (
+      userLabel
+      && typeof payload.context.required_hours === "number"
+      && typeof payload.context.possible_hours === "number"
+    ) {
+      parts.push(`${userLabel} can only reach ${payload.context.possible_hours} of ${payload.context.required_hours} required hours.`);
+    }
+
+    if (
+      userLabel
+      && typeof payload.context.required_shifts === "number"
+      && typeof payload.context.possible_shifts === "number"
+    ) {
+      parts.push(`${userLabel} can only reach ${payload.context.possible_shifts} of ${payload.context.required_shifts} required shifts.`);
+    }
   }
 
   if (Array.isArray(payload.suggestions)) {
