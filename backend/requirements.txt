@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 ortools
+pandas
 sqlalchemy
 psycopg2-binary
 pydantic
