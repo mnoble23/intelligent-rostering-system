@@ -156,6 +156,44 @@ def test_availability_endpoint_blocks_cross_workplace_user_ids():
     assert response.json()["detail"] == "User not found in your workplace"
 
 
+def test_availability_bulk_rejects_submission_when_user_cannot_reach_minimum_hours():
+    client, SessionLocal = _build_test_client()
+
+    with SessionLocal() as session:
+        seeded = _seed_two_workplaces(session)
+        seeded["workplace_a"].business_start_hour = 9
+        seeded["workplace_a"].business_end_hour = 13
+        seeded["workplace_a"].max_consecutive_shifts = 7
+        seeded["workplace_a"].min_hours_between_shifts = 11
+        seeded["staff_a"].min_hours = 10
+        session.commit()
+
+    manager_a_token = _login(client, "manager_a", "ManagerA123!")
+
+    response = client.post(
+        "/availability/bulk",
+        headers={"Authorization": f"Bearer {manager_a_token}"},
+        json={
+            "availabilities": [
+                {
+                    "user_id": seeded["staff_a"].id,
+                    "day_of_week": 0,
+                    "start_time": "09:00:00",
+                    "end_time": "13:00:00",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail["code"] == "min_hours_unreachable_on_submission"
+    assert detail["context"]["user_id"] == seeded["staff_a"].id
+    assert detail["context"]["user_name"] == "staff_a"
+    assert detail["context"]["required_hours"] == 10.0
+    assert detail["context"]["possible_hours"] == 4.0
+
+
 def test_roster_endpoints_are_isolated_by_workplace():
     client, SessionLocal = _build_test_client()
 

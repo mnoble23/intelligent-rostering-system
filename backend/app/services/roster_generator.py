@@ -67,6 +67,183 @@ def _format_day_label(day_of_week: int) -> str:
     return day_labels[day_of_week]
 
 
+def calculate_max_feasible_minutes_for_user(
+    shifts: List["Shift"],
+    week_start_date: date,
+    *,
+    max_consecutive_shifts: int = MAX_CONSECUTIVE_SHIFTS,
+    min_hours_between_shifts: int = MIN_HOURS_BETWEEN_SHIFTS,
+) -> int:
+    cp_model = _load_cp_model()
+    if cp_model is None or not shifts:
+        return 0
+
+    ordered_shifts = sorted(
+        shifts,
+        key=lambda shift: (shift.day_of_week, shift.start_time, shift.end_time),
+    )
+
+    def shift_duration_minutes(shift: Shift) -> int:
+        return (shift.end_hour - shift.start_hour) * 60
+
+    def shift_datetimes(shift: Shift) -> tuple[datetime, datetime]:
+        shift_date = week_start_date + timedelta(days=shift.day_of_week)
+        start_dt = datetime.combine(shift_date, shift.start_time)
+        if shift.end_hour == 24:
+            end_dt = datetime.combine(shift_date + timedelta(days=1), time(0, 0))
+        else:
+            end_dt = datetime.combine(shift_date, shift.end_time)
+        return start_dt, end_dt
+
+    def shifts_have_required_rest(earlier: Shift, later: Shift) -> bool:
+        earlier_start, earlier_end = shift_datetimes(earlier)
+        later_start, later_end = shift_datetimes(later)
+        if later_start < earlier_start:
+            earlier_start, later_start = later_start, earlier_start
+            earlier_end, later_end = later_end, earlier_end
+        if later_start < earlier_end:
+            return False
+        return later_start - earlier_end >= timedelta(hours=min_hours_between_shifts)
+
+    model = cp_model.CpModel()
+    shift_vars = [model.NewBoolVar(f"user_shift_{index}") for index, _ in enumerate(ordered_shifts)]
+
+    for day in range(7):
+        day_vars = [
+            shift_vars[index]
+            for index, shift in enumerate(ordered_shifts)
+            if shift.day_of_week == day
+        ]
+        if day_vars:
+            model.Add(sum(day_vars) <= 1)
+
+    if 1 <= max_consecutive_shifts < 7:
+        work_day_vars = {}
+        for day in range(7):
+            work_day_var = model.NewBoolVar(f"works_day_{day}")
+            work_day_vars[day] = work_day_var
+            day_vars = [
+                shift_vars[index]
+                for index, shift in enumerate(ordered_shifts)
+                if shift.day_of_week == day
+            ]
+            if day_vars:
+                model.Add(sum(day_vars) == work_day_var)
+            else:
+                model.Add(work_day_var == 0)
+
+        for start_day in range(0, 7 - max_consecutive_shifts):
+            model.Add(
+                sum(work_day_vars[day] for day in range(start_day, start_day + max_consecutive_shifts + 1))
+                <= max_consecutive_shifts
+            )
+
+    for left_index, left_shift in enumerate(ordered_shifts):
+        for right_index in range(left_index + 1, len(ordered_shifts)):
+            right_shift = ordered_shifts[right_index]
+            if not shifts_have_required_rest(left_shift, right_shift):
+                model.Add(shift_vars[left_index] + shift_vars[right_index] <= 1)
+
+    model.Maximize(
+        sum(
+            shift_duration_minutes(shift) * shift_vars[index]
+            for index, shift in enumerate(ordered_shifts)
+        )
+    )
+
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = 3.0
+    solver.parameters.num_search_workers = 8
+    status = solver.Solve(model)
+    if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        return 0
+    return int(solver.ObjectiveValue())
+
+
+def calculate_max_feasible_shifts_for_user(
+    shifts: List["Shift"],
+    week_start_date: date,
+    *,
+    max_consecutive_shifts: int = MAX_CONSECUTIVE_SHIFTS,
+    min_hours_between_shifts: int = MIN_HOURS_BETWEEN_SHIFTS,
+) -> int:
+    cp_model = _load_cp_model()
+    if cp_model is None or not shifts:
+        return 0
+
+    ordered_shifts = sorted(
+        shifts,
+        key=lambda shift: (shift.day_of_week, shift.start_time, shift.end_time),
+    )
+
+    def shift_datetimes(shift: Shift) -> tuple[datetime, datetime]:
+        shift_date = week_start_date + timedelta(days=shift.day_of_week)
+        start_dt = datetime.combine(shift_date, shift.start_time)
+        if shift.end_hour == 24:
+            end_dt = datetime.combine(shift_date + timedelta(days=1), time(0, 0))
+        else:
+            end_dt = datetime.combine(shift_date, shift.end_time)
+        return start_dt, end_dt
+
+    def shifts_have_required_rest(earlier: Shift, later: Shift) -> bool:
+        earlier_start, earlier_end = shift_datetimes(earlier)
+        later_start, later_end = shift_datetimes(later)
+        if later_start < earlier_start:
+            earlier_start, later_start = later_start, earlier_start
+            earlier_end, later_end = later_end, earlier_end
+        if later_start < earlier_end:
+            return False
+        return later_start - earlier_end >= timedelta(hours=min_hours_between_shifts)
+
+    model = cp_model.CpModel()
+    shift_vars = [model.NewBoolVar(f"user_shift_count_{index}") for index, _ in enumerate(ordered_shifts)]
+
+    for day in range(7):
+        day_vars = [
+            shift_vars[index]
+            for index, shift in enumerate(ordered_shifts)
+            if shift.day_of_week == day
+        ]
+        if day_vars:
+            model.Add(sum(day_vars) <= 1)
+
+    if 1 <= max_consecutive_shifts < 7:
+        work_day_vars = {}
+        for day in range(7):
+            work_day_var = model.NewBoolVar(f"works_shift_day_{day}")
+            work_day_vars[day] = work_day_var
+            day_vars = [
+                shift_vars[index]
+                for index, shift in enumerate(ordered_shifts)
+                if shift.day_of_week == day
+            ]
+            if day_vars:
+                model.Add(sum(day_vars) == work_day_var)
+            else:
+                model.Add(work_day_var == 0)
+
+        for start_day in range(0, 7 - max_consecutive_shifts):
+            model.Add(
+                sum(work_day_vars[day] for day in range(start_day, start_day + max_consecutive_shifts + 1))
+                <= max_consecutive_shifts
+            )
+
+    for left_index, left_shift in enumerate(ordered_shifts):
+        for right_index in range(left_index + 1, len(ordered_shifts)):
+            right_shift = ordered_shifts[right_index]
+            if not shifts_have_required_rest(left_shift, right_shift):
+                model.Add(shift_vars[left_index] + shift_vars[right_index] <= 1)
+
+    model.Maximize(sum(shift_vars))
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = 3.0
+    solver.parameters.num_search_workers = 8
+    status = solver.Solve(model)
+    if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        return 0
+    return int(solver.ObjectiveValue())
+
+
 @dataclass
 class Shift:
     week_start_date: date
@@ -232,75 +409,24 @@ def assign_staff_to_shifts(
         return user_roles.get(user_id, "staff").strip().lower() == MANAGER_ROLE
 
     def maximize_user_capacity(user_id: int, objective: str) -> int:
-        user_shift_indices = sorted(
-            shift_index
+        user_shifts = [
+            all_shifts[shift_index]
             for (candidate_user_id, shift_index) in assignment_vars
             if candidate_user_id == user_id
-        )
-        if not user_shift_indices:
-            return 0
-
-        capacity_model = cp_model.CpModel()
-        capacity_vars = {
-            shift_index: capacity_model.NewBoolVar(f"user_{user_id}_shift_{shift_index}")
-            for shift_index in user_shift_indices
-        }
-
-        for day in range(7):
-            day_vars = [
-                capacity_vars[shift_index]
-                for shift_index in user_shift_indices
-                if all_shifts[shift_index].day_of_week == day
-            ]
-            if day_vars:
-                capacity_model.Add(sum(day_vars) <= 1)
-
-        if 1 <= max_consecutive_shifts < 7:
-            work_day_vars = {}
-            for day in range(7):
-                work_day_var = capacity_model.NewBoolVar(f"user_{user_id}_works_day_{day}")
-                work_day_vars[day] = work_day_var
-                day_vars = [
-                    capacity_vars[shift_index]
-                    for shift_index in user_shift_indices
-                    if all_shifts[shift_index].day_of_week == day
-                ]
-                if day_vars:
-                    capacity_model.Add(sum(day_vars) == work_day_var)
-                else:
-                    capacity_model.Add(work_day_var == 0)
-            for start_day in range(0, 7 - max_consecutive_shifts):
-                capacity_model.Add(
-                    sum(work_day_vars[day] for day in range(start_day, start_day + max_consecutive_shifts + 1))
-                    <= max_consecutive_shifts
-                )
-
-        for left_pos, left_index in enumerate(user_shift_indices):
-            left_shift = all_shifts[left_index]
-            for right_index in user_shift_indices[left_pos + 1:]:
-                right_shift = all_shifts[right_index]
-                if not shifts_have_required_rest(left_shift, right_shift):
-                    capacity_model.Add(capacity_vars[left_index] + capacity_vars[right_index] <= 1)
-
-        if objective == "shifts":
-            capacity_model.Maximize(sum(capacity_vars.values()))
-        else:
-            capacity_model.Maximize(
-                sum(
-                    shift_duration_minutes(all_shifts[shift_index]) * capacity_vars[shift_index]
-                    for shift_index in user_shift_indices
-                )
+        ]
+        if objective == "minutes":
+            return calculate_max_feasible_minutes_for_user(
+                user_shifts,
+                week_start_date,
+                max_consecutive_shifts=max_consecutive_shifts,
+                min_hours_between_shifts=min_hours_between_shifts,
             )
-
-        capacity_solver = cp_model.CpSolver()
-        capacity_solver.parameters.max_time_in_seconds = 3.0
-        capacity_solver.parameters.num_search_workers = 8
-        status = capacity_solver.Solve(capacity_model)
-        if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-            return 0
-        if objective == "shifts":
-            return int(capacity_solver.ObjectiveValue())
-        return int(capacity_solver.ObjectiveValue())
+        return calculate_max_feasible_shifts_for_user(
+            user_shifts,
+            week_start_date,
+            max_consecutive_shifts=max_consecutive_shifts,
+            min_hours_between_shifts=min_hours_between_shifts,
+        )
 
     model = cp_model.CpModel()
     assignment_vars: Dict[tuple[int, int], Any] = {}
