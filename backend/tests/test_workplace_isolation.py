@@ -264,6 +264,8 @@ def test_workplace_constraints_can_be_read_and_updated_by_manager():
             "min_managers_per_hour": 1,
             "max_consecutive_shifts": 4,
             "min_hours_between_shifts": 12,
+            "business_start_hour": 6,
+            "business_end_hour": 22,
         },
     )
     assert put_response.status_code == 200
@@ -288,6 +290,8 @@ def test_workplace_constraints_reject_invalid_manager_requirements():
             "min_managers_per_hour": 2,
             "max_consecutive_shifts": 5,
             "min_hours_between_shifts": 11,
+            "business_start_hour": 6,
+            "business_end_hour": 22,
         },
     )
     assert bad_update.status_code == 400
