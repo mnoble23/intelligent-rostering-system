@@ -91,8 +91,8 @@ DEMO_STAFF_PASSWORD=Staff123!
 cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 Backend: `http://127.0.0.1:8000`
@@ -129,10 +129,11 @@ docker compose up --build
 - Workplace isolation across users, availability, shifts, and assignments
 - User CRUD (manager-controlled) with min/max hours and min/max shifts per week
 - Availability submission (single and bulk) with overlap validation
-- Weekly roster generation for up to 52 weeks in one request
+- Weekly roster generation for up to 52 weeks in one request using a CP-SAT constraint solver
 - Manual assignment and unassignment endpoints
 - Shift coverage endpoint for understaffing visibility
 - Workplace constraints endpoints for staffing rules
+- Actionable roster infeasibility diagnostics for unreachable user minimums and uncovered staffing/manager hours
 - React frontend pages for dashboard, roster generation, assignment management, profile, and coverage
 - Dockerized local stack for frontend, backend, and PostgreSQL
 - Backend tests for route security and workplace isolation
@@ -141,13 +142,13 @@ docker compose up --build
 - Add DB-level uniqueness/index constraints for stronger tenant safety and performance
 - Expand automated test coverage for scheduling edge cases and multi-week generation behavior
 - Improve UX for availability entry (faster editing, fewer repetitive inputs)
-- Add richer scheduler failure explanations when constraints cannot be satisfied
 - Continue evolving fairness objectives (weekends/nights/load balancing)
 
 ## Roster Generation and Constraints
 Current scheduler behavior:
 - Generates weekly shifts within business hours (`06:00`-`22:00`)
 - Builds assignable shifts from submitted availability
+- Uses a CP-SAT constraint solver to assign staff across the full week
 - Applies workplace-level constraints:
   - `min_staff_per_shift`
   - `min_managers_per_hour`
@@ -156,6 +157,17 @@ Current scheduler behavior:
 - Respects user-level limits:
   - `min_hours` / `max_hours`
   - `min_shifts_per_week` / `max_shifts_per_week`
+- Reports actionable infeasibility details when hard constraints cannot be satisfied, including:
+  - users who cannot possibly reach minimum weekly hours
+  - users who cannot possibly reach minimum weekly shifts
+  - hours without enough feasible staff coverage
+  - hours without enough feasible manager coverage
+
+## Troubleshooting (Manual Python Setup)
+- If you have multiple Python installations on Windows, prefer:
+  - `python -m pip install -r requirements.txt`
+  - `python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload`
+- Avoid setting `PYTHONPATH` to another Python version's `site-packages` directory, as this can break imports for packages like `numpy`, `pydantic`, and `ortools`.
 
 ## Potential Future Upgrades
 - Configurable business operating hours from the UI
@@ -165,7 +177,7 @@ Current scheduler behavior:
 - Holidays/time-off integration
 - Skill-based coverage rules
 - Preference-aware optimization
-- Constraint-programming style optimization for better global fairness
+- Better global fairness objectives on top of the existing constraint-programming solver
 
 ## License
 This project is licensed under the MIT License.
