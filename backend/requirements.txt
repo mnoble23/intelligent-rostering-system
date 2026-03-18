@@ -2,6 +2,7 @@ fastapi
 uvicorn
 ortools
 pandas
+httpx
 sqlalchemy
 psycopg2-binary
 pydantic
