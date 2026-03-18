@@ -17,8 +17,9 @@ from app.models.workplace_db import WorkplaceDB
 from app.services.roster_generator import (
     RosterGenerationError,
     Shift,
-    assign_staff_to_shifts,
     generate_weekly_shifts,
+    parse_allowed_shift_lengths,
+    assign_staff_to_shifts,
     match_availability_to_shifts,
 )
 
@@ -367,3 +368,15 @@ def test_cp_solver_reports_unreachable_manager_coverage_before_solving():
     assert exc_info.value.code == "manager_coverage_unreachable"
     assert exc_info.value.context["day_of_week"] == 0
     assert exc_info.value.context["hour"] == 9
+
+
+def test_generate_weekly_shifts_uses_configured_shift_lengths():
+    weekly_shifts = generate_weekly_shifts(
+        date(2026, 1, 5),
+        business_start_hour=9,
+        business_end_hour=17,
+        allowed_shift_hours=parse_allowed_shift_lengths("5,8"),
+    )
+
+    monday_lengths = sorted({shift.end_hour - shift.start_hour for shift in weekly_shifts[0]})
+    assert monday_lengths == [5, 8]

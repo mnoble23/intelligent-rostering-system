@@ -293,6 +293,7 @@ def test_workplace_constraints_can_be_read_and_updated_by_manager():
     assert get_response.json()["min_managers_per_hour"] == 1
     assert get_response.json()["max_consecutive_shifts"] == 7
     assert get_response.json()["min_hours_between_shifts"] == 11
+    assert get_response.json()["allowed_shift_lengths"] == "4,6,9"
 
     put_response = client.put(
         "/workplace/constraints",
@@ -304,6 +305,7 @@ def test_workplace_constraints_can_be_read_and_updated_by_manager():
             "min_hours_between_shifts": 12,
             "business_start_hour": 6,
             "business_end_hour": 22,
+            "allowed_shift_lengths": "5,8",
         },
     )
     assert put_response.status_code == 200
@@ -311,6 +313,7 @@ def test_workplace_constraints_can_be_read_and_updated_by_manager():
     assert put_response.json()["min_managers_per_hour"] == 1
     assert put_response.json()["max_consecutive_shifts"] == 4
     assert put_response.json()["min_hours_between_shifts"] == 12
+    assert put_response.json()["allowed_shift_lengths"] == "5,8"
 
 
 def test_workplace_constraints_reject_invalid_manager_requirements():
@@ -330,6 +333,7 @@ def test_workplace_constraints_reject_invalid_manager_requirements():
             "min_hours_between_shifts": 11,
             "business_start_hour": 6,
             "business_end_hour": 22,
+            "allowed_shift_lengths": "4,6,9",
         },
     )
     assert bad_update.status_code == 400

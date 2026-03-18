@@ -67,6 +67,18 @@ def _format_day_label(day_of_week: int) -> str:
     return day_labels[day_of_week]
 
 
+def parse_allowed_shift_lengths(value: str | None) -> tuple[int, ...]:
+    if value is None:
+        return ALLOWED_SHIFT_HOURS
+    parts = [part.strip() for part in value.split(",")]
+    lengths = sorted({int(part) for part in parts if part.strip()})
+    if not lengths:
+        raise ValueError("At least one shift length is required")
+    if any(length <= 0 or length > 24 for length in lengths):
+        raise ValueError("Shift lengths must be whole hours between 1 and 24")
+    return tuple(lengths)
+
+
 def calculate_max_feasible_minutes_for_user(
     shifts: List["Shift"],
     week_start_date: date,
@@ -259,12 +271,13 @@ def generate_weekly_shifts(
     week_start_date: date,
     business_start_hour: int = BUSINESS_START,
     business_end_hour: int = BUSINESS_END,
+    allowed_shift_hours: tuple[int, ...] = ALLOWED_SHIFT_HOURS,
 ) -> Dict[int, List[Shift]]:
     weekly_shifts: Dict[int, List[Shift]] = {}
     for day in range(7):
         shifts: List[Shift] = []
         for start_hour in range(business_start_hour, business_end_hour):
-            for duration_hours in ALLOWED_SHIFT_HOURS:
+            for duration_hours in allowed_shift_hours:
                 end_hour = start_hour + duration_hours
                 if end_hour > business_end_hour:
                     continue

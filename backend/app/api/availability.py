@@ -13,6 +13,7 @@ from app.services.roster_generator import (
     calculate_max_feasible_minutes_for_user,
     generate_weekly_shifts,
     match_availability_to_shifts,
+    parse_allowed_shift_lengths,
 )
 
 router = APIRouter(
@@ -56,6 +57,7 @@ def _validate_minimum_hours_reachability(
         week_start,
         business_start_hour=workplace.business_start_hour,
         business_end_hour=workplace.business_end_hour,
+        allowed_shift_hours=parse_allowed_shift_lengths(workplace.allowed_shift_lengths),
     )
     staffable_shifts = match_availability_to_shifts(weekly_availability, weekly_shifts)
     user_shifts = [

@@ -15,4 +15,5 @@ class WorkplaceDB(Base):
     min_hours_between_shifts = Column(Integer, nullable=False, default=11, server_default="11")
     business_start_hour = Column(Integer, nullable=False, default=6, server_default="6")
     business_end_hour = Column(Integer, nullable=False, default=22, server_default="22")
+    allowed_shift_lengths = Column(String, nullable=False, default="4,6,9", server_default="4,6,9")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

@@ -200,6 +200,23 @@ with engine.begin() as connection:
         connection.execute(
             text('ALTER TABLE "workplace" ALTER COLUMN business_end_hour SET DEFAULT 22')
         )
+    if "allowed_shift_lengths" not in workplace_columns:
+        connection.execute(
+            text('ALTER TABLE "workplace" ADD COLUMN allowed_shift_lengths VARCHAR')
+        )
+        connection.execute(
+            text('UPDATE "workplace" SET allowed_shift_lengths = \'4,6,9\' WHERE allowed_shift_lengths IS NULL')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN allowed_shift_lengths SET DEFAULT \'4,6,9\'')
+        )
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN allowed_shift_lengths SET NOT NULL')
+        )
+    if "allowed_shift_lengths" in workplace_columns:
+        connection.execute(
+            text('ALTER TABLE "workplace" ALTER COLUMN allowed_shift_lengths SET DEFAULT \'4,6,9\'')
+        )
 
     default_workplace_row = connection.execute(
         text('SELECT id FROM workplace ORDER BY id LIMIT 1')

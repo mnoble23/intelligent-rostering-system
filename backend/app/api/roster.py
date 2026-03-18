@@ -18,6 +18,7 @@ from app.services.roster_generator import (
     assign_staff_to_shifts,
     generate_weekly_shifts,
     match_availability_to_shifts,
+    parse_allowed_shift_lengths,
 )
 
 router = APIRouter(
@@ -104,7 +105,7 @@ def resolve_week_start(db: Session, workplace_id: int, requested_week_start: dat
     return None
 
 
-def get_workplace_constraints(db: Session, workplace_id: int) -> tuple[int, int, int, int, int, int]:
+def get_workplace_constraints(db: Session, workplace_id: int) -> tuple[int, int, int, int, int, int, tuple[int, ...]]:
     workplace = db.query(WorkplaceDB).filter_by(id=workplace_id).first()
     if workplace is None:
         raise HTTPException(status_code=404, detail="Workplace not found")
@@ -115,6 +116,7 @@ def get_workplace_constraints(db: Session, workplace_id: int) -> tuple[int, int,
         workplace.min_hours_between_shifts,
         workplace.business_start_hour,
         workplace.business_end_hour,
+        parse_allowed_shift_lengths(workplace.allowed_shift_lengths),
     )
 
 
@@ -138,11 +140,13 @@ def debug_shifts(
         _min_hours_between_shifts,
         business_start_hour,
         business_end_hour,
+        allowed_shift_hours,
     ) = get_workplace_constraints(db, current_user.workplace_id)
     weekly = generate_weekly_shifts(
         get_week_start(date.today()),
         business_start_hour=business_start_hour,
         business_end_hour=business_end_hour,
+        allowed_shift_hours=allowed_shift_hours,
     )
     return {day: [f"{s.start_time}-{s.end_time}" for s in shifts] for day, shifts in weekly.items()}
 
@@ -160,11 +164,13 @@ def debug_staffable_shifts(
         _min_hours_between_shifts,
         business_start_hour,
         business_end_hour,
+        allowed_shift_hours,
     ) = get_workplace_constraints(db, current_user.workplace_id)
     weekly_shifts = generate_weekly_shifts(
         get_week_start(date.today()),
         business_start_hour=business_start_hour,
         business_end_hour=business_end_hour,
+        allowed_shift_hours=allowed_shift_hours,
     )
     staffable = match_availability_to_shifts(availability_map, weekly_shifts)
 
@@ -194,6 +200,7 @@ def debug_assigned_shifts(
         min_hours_between_shifts,
         business_start_hour,
         business_end_hour,
+        allowed_shift_hours,
     ) = get_workplace_constraints(db, current_user.workplace_id)
 
     week_start = get_week_start(date.today())
@@ -201,6 +208,7 @@ def debug_assigned_shifts(
         week_start,
         business_start_hour=business_start_hour,
         business_end_hour=business_end_hour,
+        allowed_shift_hours=allowed_shift_hours,
     )
 
     staffable_shifts = match_availability_to_shifts(availability_map, weekly_shifts)
@@ -261,6 +269,7 @@ def generate_roster(
         min_hours_between_shifts,
         business_start_hour,
         business_end_hour,
+        allowed_shift_hours,
     ) = get_workplace_constraints(db, current_user.workplace_id)
     users = db.query(UserDB).filter_by(workplace_id=current_user.workplace_id).all()
     user_hour_limits = {
@@ -284,6 +293,7 @@ def generate_roster(
                 week_start,
                 business_start_hour=business_start_hour,
                 business_end_hour=business_end_hour,
+                allowed_shift_hours=allowed_shift_hours,
             )
             staffable_shifts = match_availability_to_shifts(
                 weekly_availability,

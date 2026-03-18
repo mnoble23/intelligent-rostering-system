@@ -10,6 +10,7 @@ interface WorkplaceConstraintsResponse {
   min_hours_between_shifts: number;
   business_start_hour: number;
   business_end_hour: number;
+  allowed_shift_lengths: string;
 }
 
 function validateConstraints(values: WorkplaceConstraintsResponse) {
@@ -51,6 +52,16 @@ function validateConstraints(values: WorkplaceConstraintsResponse) {
   }
   if (values.business_end_hour <= values.business_start_hour) {
     return "Business end hour must be later than business start hour.";
+  }
+  const shiftLengths = values.allowed_shift_lengths
+    .split(",")
+    .map(part => Number(part.trim()))
+    .filter(value => !Number.isNaN(value));
+  if (shiftLengths.length === 0) {
+    return "Add at least one shift length.";
+  }
+  if (shiftLengths.some(value => !Number.isInteger(value) || value < 1 || value > 24)) {
+    return "Shift lengths must be whole hours between 1 and 24.";
   }
 
   return null;
@@ -97,8 +108,9 @@ export default function WorkplaceConstraints() {
       | "max_consecutive_shifts"
       | "min_hours_between_shifts"
       | "business_start_hour"
-      | "business_end_hour",
-    value: number
+      | "business_end_hour"
+      | "allowed_shift_lengths",
+    value: number | string
   ) => {
     setConstraints(current => {
       if (!current) return current;
@@ -125,6 +137,7 @@ export default function WorkplaceConstraints() {
         min_hours_between_shifts: constraints.min_hours_between_shifts,
         business_start_hour: constraints.business_start_hour,
         business_end_hour: constraints.business_end_hour,
+        allowed_shift_lengths: constraints.allowed_shift_lengths,
       });
       setConstraints(response.data);
       setStatus("Constraints saved.");
@@ -136,6 +149,8 @@ export default function WorkplaceConstraints() {
         detailMap: {
           "min_managers_per_hour cannot exceed min_staff_per_shift": "Min managers per hour cannot exceed min staff per shift.",
           "business_end_hour must be later than business_start_hour": "Business end hour must be later than business start hour.",
+          "At least one shift length is required": "Add at least one shift length.",
+          "Shift lengths must be whole hours between 1 and 24": "Shift lengths must be whole hours between 1 and 24.",
         },
       }));
       setStatusType("error");
@@ -240,6 +255,17 @@ export default function WorkplaceConstraints() {
                 </option>
               ))}
             </select>
+          </label>
+
+          <label className="workplace-constraints__field">
+            <span>Allowed shift lengths</span>
+            <input
+              type="text"
+              value={constraints?.allowed_shift_lengths ?? "4,6,9"}
+              onChange={event => updateConstraint("allowed_shift_lengths", event.target.value)}
+              disabled={!constraints || statusType === "loading"}
+              placeholder="4,6,9"
+            />
           </label>
 
           <button type="button" className="workplace-constraints__save" onClick={handleSave} disabled={!constraints || statusType === "loading"}>
