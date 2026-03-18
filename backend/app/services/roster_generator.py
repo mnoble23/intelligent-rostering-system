@@ -42,12 +42,28 @@ class RosterGenerationError(ValueError):
         self.context = context or {}
 
 
+def build_solver_unavailable_error() -> RosterGenerationError:
+    return RosterGenerationError(
+        code="solver_unavailable",
+        message="Roster generation failed: constraint solver dependency is not installed.",
+        explanation="The roster engine is configured to use OR-Tools CP-SAT, but the package is unavailable.",
+        suggestions=[
+            "Install backend dependencies again so OR-Tools is included.",
+            "Verify the deployment image includes the ortools package.",
+        ],
+    )
+
+
 def _load_cp_model() -> Any | None:
     try:
         from ortools.sat.python import cp_model as ortools_cp_model
     except ImportError:  # pragma: no cover - exercised in environments without OR-Tools.
         return None
     return ortools_cp_model
+
+
+def solver_is_available() -> bool:
+    return _load_cp_model() is not None
 
 
 def _format_hour_label(hour: int) -> str:
@@ -338,15 +354,7 @@ def assign_staff_to_shifts(
 ) -> Dict[int, List[Shift]]:
     cp_model = _load_cp_model()
     if cp_model is None:
-        raise RosterGenerationError(
-            code="solver_unavailable",
-            message="Roster generation failed: constraint solver dependency is not installed.",
-            explanation="The roster engine is configured to use OR-Tools CP-SAT, but the package is unavailable.",
-            suggestions=[
-                "Install backend dependencies again so OR-Tools is included.",
-                "Verify the deployment image includes the ortools package.",
-            ],
-        )
+        raise build_solver_unavailable_error()
 
     user_hour_limits = user_hour_limits or {}
     user_shift_limits = user_shift_limits or {}

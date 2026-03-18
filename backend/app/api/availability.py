@@ -10,10 +10,12 @@ from app.models.user_db import UserDB
 from app.models.workplace_db import WorkplaceDB
 from app.schemas.availability import AvailabilityBulkCreate, AvailabilityCreate, AvailabilityResponse
 from app.services.roster_generator import (
+    build_solver_unavailable_error,
     calculate_max_feasible_minutes_for_user,
     generate_weekly_shifts,
     match_availability_to_shifts,
     parse_allowed_shift_lengths,
+    solver_is_available,
 )
 
 router = APIRouter(
@@ -38,6 +40,22 @@ def _validate_minimum_hours_reachability(
 ) -> None:
     if min_hours <= 0:
         return
+
+    if not solver_is_available():
+        error = build_solver_unavailable_error()
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": error.code,
+                "message": error.message,
+                "explanation": error.explanation,
+                "suggestions": error.suggestions,
+                "context": {
+                    "user_id": user_id,
+                    "user_name": user_name,
+                },
+            },
+        )
 
     workplace = db.query(WorkplaceDB).filter_by(id=workplace_id).first()
     if workplace is None:
