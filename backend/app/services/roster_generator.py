@@ -7,6 +7,11 @@ from sqlalchemy.orm import Session
 from app.models.shift_assignment_db import ShiftAssignmentDB
 from app.models.shift_db import ShiftDB
 
+try:
+    from ortools.sat.python import cp_model
+except ImportError:  # pragma: no cover - exercised in environments without OR-Tools.
+    cp_model = None
+
 WeeklyAvailability = Dict[int, Dict[int, List[Tuple[time, time]]]]
 UserHourLimits = Dict[int, Tuple[float, float]]
 UserShiftLimits = Dict[int, Tuple[int, int]]
@@ -20,6 +25,7 @@ MIN_MANAGERS_PER_HOUR = 1
 MAX_CONSECUTIVE_SHIFTS = 7
 MIN_HOURS_BETWEEN_SHIFTS = 11
 MANAGER_ROLE = "manager"
+SOLVER_TIME_LIMIT_SECONDS = 10.0
 
 
 class RosterGenerationError(ValueError):
@@ -119,57 +125,58 @@ def assign_staff_to_shifts(
     business_start_hour: int = BUSINESS_START,
     business_end_hour: int = BUSINESS_END,
 ) -> Dict[int, List[Shift]]:
-    def shift_duration_hours(shift: Shift) -> float:
-        return (shift.end_hour - shift.start_hour)
+    if cp_model is None:
+        raise RosterGenerationError(
+            code="solver_unavailable",
+            message="Roster generation failed: constraint solver dependency is not installed.",
+            explanation="The roster engine is configured to use OR-Tools CP-SAT, but the package is unavailable.",
+            suggestions=[
+                "Install backend dependencies again so OR-Tools is included.",
+                "Verify the deployment image includes the ortools package.",
+            ],
+        )
 
     user_hour_limits = user_hour_limits or {}
     user_shift_limits = user_shift_limits or {}
     user_roles = user_roles or {}
-    user_assigned_hours: Dict[int, float] = {}
-    user_assigned_shift_counts: Dict[int, int] = {}
-    for shifts in staffable_shifts.values():
-        for shift in shifts:
-            for user_id in shift.staff:
-                user_assigned_hours.setdefault(user_id, 0.0)
-                user_assigned_shift_counts.setdefault(user_id, 0)
-    for user_id in user_hour_limits:
-        user_assigned_hours.setdefault(user_id, 0.0)
-        user_assigned_shift_counts.setdefault(user_id, 0)
-    for user_id in user_shift_limits:
-        user_assigned_shift_counts.setdefault(user_id, 0)
 
-    assigned_shifts: Dict[int, List[Shift]] = {day: [] for day in range(7)}
-    user_daily_assignments: Dict[int, Dict[int, List[Shift]]] = {}
-    ordered_shifts_by_day: Dict[int, List[Shift]] = {}
-    available_candidates_by_shift: Dict[int, List[int]] = {}
-    assigned_staff_by_shift: Dict[int, List[int]] = {}
-    hourly_assigned_staff_by_day: Dict[int, Dict[int, int]] = {}
-    hourly_assigned_managers_by_day: Dict[int, Dict[int, int]] = {}
-    shift_lookup_by_id: Dict[int, Shift] = {}
-    shift_day_by_id: Dict[int, int] = {}
-
-    for day, shifts in staffable_shifts.items():
-        ordered_shifts = sorted(
-            shifts,
-            key=lambda shift: (
-                -shift_duration_hours(shift),
-                shift.start_time,
-                shift.end_time,
-            ),
+    all_shifts = [
+        shift
+        for day in range(7)
+        for shift in sorted(
+            staffable_shifts.get(day, []),
+            key=lambda item: (item.start_time, item.end_time),
         )
-        ordered_shifts_by_day[day] = ordered_shifts
-        hourly_assigned_staff_by_day[day] = {
-            hour: 0 for hour in range(business_start_hour, business_end_hour)
+    ]
+    if not all_shifts:
+        raise RosterGenerationError(
+            code="no_staffable_shifts",
+            message="Roster generation failed: no feasible shifts were available to assign.",
+            explanation="No generated shift had enough available staff candidates to be considered.",
+            suggestions=[
+                "Add or widen staff availability.",
+                "Review business hours and generated shift templates.",
+            ],
+        )
+
+    shift_ids = {id(shift): index for index, shift in enumerate(all_shifts)}
+    shifts_by_day: Dict[int, List[Shift]] = {day: [] for day in range(7)}
+    for shift in all_shifts:
+        shifts_by_day[shift.day_of_week].append(shift)
+
+    users = sorted(
+        {
+            user_id
+            for shift in all_shifts
+            for user_id in shift.staff
         }
-        hourly_assigned_managers_by_day[day] = {
-            hour: 0 for hour in range(business_start_hour, business_end_hour)
-        }
-        for shift in ordered_shifts:
-            shift_id = id(shift)
-            shift_lookup_by_id[shift_id] = shift
-            shift_day_by_id[shift_id] = day
-            available_candidates_by_shift[shift_id] = list(shift.staff)
-            assigned_staff_by_shift[shift_id] = []
+        | set(user_hour_limits)
+        | set(user_shift_limits)
+        | set(user_roles)
+    )
+
+    def shift_duration_minutes(shift: Shift) -> int:
+        return (shift.end_hour - shift.start_hour) * 60
 
     def shift_datetimes(shift: Shift) -> tuple[datetime, datetime]:
         shift_date = week_start_date + timedelta(days=shift.day_of_week)
@@ -180,449 +187,219 @@ def assign_staff_to_shifts(
             end_dt = datetime.combine(shift_date, shift.end_time)
         return start_dt, end_dt
 
-    def would_exceed_max_consecutive_shifts(user_id: int, candidate_day: int) -> bool:
-        assigned_days = set(user_daily_assignments.get(user_id, {}).keys())
-        assigned_days.add(candidate_day)
-        return projected_consecutive_run(user_id, candidate_day) > max_consecutive_shifts
-
-    def _max_consecutive_run(assigned_days: set[int]) -> int:
-        max_run = 0
-        current_run = 0
-        for day in range(7):
-            if day in assigned_days:
-                current_run += 1
-                max_run = max(max_run, current_run)
-            else:
-                current_run = 0
-        return max_run
-
-    def projected_consecutive_run(user_id: int, candidate_day: int) -> int:
-        assigned_days = set(user_daily_assignments.get(user_id, {}).keys())
-        assigned_days.add(candidate_day)
-        return _max_consecutive_run(assigned_days)
-
-    def has_minimum_rest_gap(user_id: int, candidate_shift: Shift) -> bool:
-        candidate_start, candidate_end = shift_datetimes(candidate_shift)
-        required_gap = timedelta(hours=min_hours_between_shifts)
-        for assigned_shifts_by_day in user_daily_assignments.get(user_id, {}).values():
-            for assigned_shift in assigned_shifts_by_day:
-                assigned_start, assigned_end = shift_datetimes(assigned_shift)
-                if candidate_start >= assigned_end:
-                    gap = candidate_start - assigned_end
-                elif assigned_start >= candidate_end:
-                    gap = assigned_start - candidate_end
-                else:
-                    return False
-                if gap < required_gap:
-                    return False
-        return True
-
-    def can_assign_user_to_shift(user_id: int, shift_id: int) -> bool:
-        shift = shift_lookup_by_id[shift_id]
-        day = shift_day_by_id[shift_id]
-        duration_hours = shift_duration_hours(shift)
-        user_daily_assignments.setdefault(user_id, {}).setdefault(day, [])
-        already_assigned_today = len(user_daily_assignments[user_id][day]) > 0
-        if already_assigned_today:
+    def shifts_have_required_rest(earlier: Shift, later: Shift) -> bool:
+        earlier_start, earlier_end = shift_datetimes(earlier)
+        later_start, later_end = shift_datetimes(later)
+        if later_start < earlier_start:
+            earlier_start, later_start = later_start, earlier_start
+            earlier_end, later_end = later_end, earlier_end
+        if later_start < earlier_end:
             return False
-
-        if would_exceed_max_consecutive_shifts(user_id, day):
-            return False
-
-        if not has_minimum_rest_gap(user_id, shift):
-            return False
-
-        _, max_shifts = user_shift_limits.get(user_id, (0, 7))
-        exceeds_max_shifts = user_assigned_shift_counts.get(user_id, 0) + 1 > max_shifts
-        if exceeds_max_shifts:
-            return False
-
-        _, max_hours = user_hour_limits.get(user_id, (0.0, float("inf")))
-        exceeds_max_hours = user_assigned_hours.get(user_id, 0.0) + duration_hours > max_hours
-        if exceeds_max_hours:
-            return False
-
-        if user_id in assigned_staff_by_shift[shift_id]:
-            return False
-
-        return True
+        return later_start - earlier_end >= timedelta(hours=min_hours_between_shifts)
 
     def is_manager(user_id: int) -> bool:
         return user_roles.get(user_id, "staff").strip().lower() == MANAGER_ROLE
 
-    def apply_assignment(user_id: int, shift_id: int) -> None:
-        shift = shift_lookup_by_id[shift_id]
-        day = shift_day_by_id[shift_id]
-        duration_hours = shift_duration_hours(shift)
-        assigned_staff_by_shift[shift_id].append(user_id)
-        user_daily_assignments.setdefault(user_id, {}).setdefault(day, []).append(shift)
-        user_assigned_hours[user_id] = user_assigned_hours.get(user_id, 0.0) + duration_hours
-        user_assigned_shift_counts[user_id] = user_assigned_shift_counts.get(user_id, 0) + 1
-        for hour in range(shift.start_hour, shift.end_hour):
-            hourly_assigned_staff_by_day[day][hour] += 1
-            if is_manager(user_id):
-                hourly_assigned_managers_by_day[day][hour] += 1
+    model = cp_model.CpModel()
+    assignment_vars: Dict[tuple[int, int], cp_model.IntVar] = {}
 
-    while True:
-        best_manager_assignment: Tuple[int, int, float, int, int] | None = None
+    for shift in all_shifts:
+        shift_index = shift_ids[id(shift)]
+        for user_id in sorted(set(shift.staff)):
+            assignment_vars[(user_id, shift_index)] = model.NewBoolVar(
+                f"assign_u{user_id}_s{shift_index}"
+            )
 
-        for day, ordered_shifts in ordered_shifts_by_day.items():
-            hourly_assigned_managers = hourly_assigned_managers_by_day[day]
-            for shift in ordered_shifts:
-                shift_id = id(shift)
-                duration_hours = shift_duration_hours(shift)
-                manager_candidates = [
-                    user_id
-                    for user_id in available_candidates_by_shift[shift_id]
-                    if is_manager(user_id)
+    if not assignment_vars:
+        raise RosterGenerationError(
+            code="no_assignment_candidates",
+            message="Roster generation failed: no staff could be assigned to any generated shift.",
+            explanation="Availability filtering produced shifts, but no feasible user-shift assignments remained for the solver.",
+            suggestions=[
+                "Review availability data for time format or overlap issues.",
+                "Check that active users exist in the workplace.",
+            ],
+        )
+
+    for day, day_shifts in shifts_by_day.items():
+        for user_id in users:
+            user_day_vars = [
+                assignment_vars[(user_id, shift_ids[id(shift)])]
+                for shift in day_shifts
+                if (user_id, shift_ids[id(shift)]) in assignment_vars
+            ]
+            if user_day_vars:
+                model.Add(sum(user_day_vars) <= 1)
+
+    for user_id in users:
+        user_vars = [
+            var
+            for (candidate_user_id, _), var in assignment_vars.items()
+            if candidate_user_id == user_id
+        ]
+        if not user_vars:
+            min_shifts, _ = user_shift_limits.get(user_id, (0, 0))
+            min_hours, _ = user_hour_limits.get(user_id, (0.0, 0.0))
+            if min_shifts > 0 or min_hours > 0:
+                raise RosterGenerationError(
+                    code="user_has_no_feasible_assignments",
+                    message="Roster generation failed: a required user has no feasible assignments.",
+                    explanation="At least one user has minimum weekly requirements but no solver-eligible shifts.",
+                    suggestions=[
+                        "Increase that user's availability.",
+                        "Lower their minimum hour or shift requirement.",
+                    ],
+                    context={"user_id": user_id},
+                )
+            continue
+
+        min_shifts, max_shifts = user_shift_limits.get(user_id, (0, 7))
+        model.Add(sum(user_vars) >= min_shifts)
+        model.Add(sum(user_vars) <= max_shifts)
+
+        min_minutes = int(round(user_hour_limits.get(user_id, (0.0, float("inf")))[0] * 60))
+        max_hours = user_hour_limits.get(user_id, (0.0, float("inf")))[1]
+        max_minutes = sum(
+            shift_duration_minutes(all_shifts[shift_index])
+            for (candidate_user_id, shift_index), _ in assignment_vars.items()
+            if candidate_user_id == user_id
+        ) if max_hours == float("inf") else int(round(max_hours * 60))
+
+        user_minutes = sum(
+            shift_duration_minutes(all_shifts[shift_index]) * var
+            for (candidate_user_id, shift_index), var in assignment_vars.items()
+            if candidate_user_id == user_id
+        )
+        model.Add(user_minutes >= min_minutes)
+        model.Add(user_minutes <= max_minutes)
+
+    if 1 <= max_consecutive_shifts < 7:
+        work_day_vars: Dict[tuple[int, int], cp_model.IntVar] = {}
+        for user_id in users:
+            for day in range(7):
+                day_vars = [
+                    assignment_vars[(user_id, shift_ids[id(shift)])]
+                    for shift in shifts_by_day[day]
+                    if (user_id, shift_ids[id(shift)]) in assignment_vars
                 ]
-                sorted_manager_candidates = sorted(
-                    manager_candidates,
-                    key=lambda user_id: (
-                        projected_consecutive_run(user_id, day),
-                        user_assigned_shift_counts.get(user_id, 0),
-                        -max(
-                            0.0,
-                            user_hour_limits.get(user_id, (0.0, float("inf")))[0]
-                            - user_assigned_hours.get(user_id, 0.0),
-                        ),
-                        -(
-                            user_hour_limits.get(user_id, (0.0, float("inf")))[1]
-                            - user_assigned_hours.get(user_id, 0.0)
-                        ),
-                        user_assigned_hours.get(user_id, 0.0),
-                        user_id,
-                    ),
+                work_day_var = model.NewBoolVar(f"works_u{user_id}_d{day}")
+                work_day_vars[(user_id, day)] = work_day_var
+                if day_vars:
+                    model.Add(sum(day_vars) == work_day_var)
+                else:
+                    model.Add(work_day_var == 0)
+
+            for start_day in range(0, 7 - max_consecutive_shifts):
+                model.Add(
+                    sum(
+                        work_day_vars[(user_id, day)]
+                        for day in range(start_day, start_day + max_consecutive_shifts + 1)
+                    )
+                    <= max_consecutive_shifts
                 )
 
-                for user_id in sorted_manager_candidates:
-                    if not can_assign_user_to_shift(user_id, shift_id):
-                        continue
-
-                    manager_coverage_gain = sum(
-                        1
-                        for hour in range(shift.start_hour, shift.end_hour)
-                        if hourly_assigned_managers[hour] < min_managers_per_hour
+    for user_id in users:
+        user_shift_indices = sorted(
+            shift_index
+            for (candidate_user_id, shift_index) in assignment_vars
+            if candidate_user_id == user_id
+        )
+        for left_pos, left_index in enumerate(user_shift_indices):
+            left_shift = all_shifts[left_index]
+            for right_index in user_shift_indices[left_pos + 1:]:
+                right_shift = all_shifts[right_index]
+                if not shifts_have_required_rest(left_shift, right_shift):
+                    model.Add(
+                        assignment_vars[(user_id, left_index)] + assignment_vars[(user_id, right_index)] <= 1
                     )
-                    if manager_coverage_gain <= 0:
-                        continue
 
-                    if (
-                        best_manager_assignment is None
-                        or manager_coverage_gain > best_manager_assignment[3]
-                        or (
-                            manager_coverage_gain == best_manager_assignment[3]
-                            and duration_hours > best_manager_assignment[2]
-                        )
-                        or (
-                            manager_coverage_gain == best_manager_assignment[3]
-                            and duration_hours == best_manager_assignment[2]
-                            and projected_consecutive_run(user_id, day)
-                            < projected_consecutive_run(
-                                best_manager_assignment[1],
-                                best_manager_assignment[4],
-                            )
-                        )
-                        or (
-                            manager_coverage_gain == best_manager_assignment[3]
-                            and duration_hours == best_manager_assignment[2]
-                            and projected_consecutive_run(user_id, day)
-                            == projected_consecutive_run(
-                                best_manager_assignment[1],
-                                best_manager_assignment[4],
-                            )
-                            and user_assigned_shift_counts.get(user_id, 0)
-                            < user_assigned_shift_counts.get(best_manager_assignment[1], 0)
-                        )
-                        or (
-                            manager_coverage_gain == best_manager_assignment[3]
-                            and duration_hours == best_manager_assignment[2]
-                            and user_assigned_hours.get(user_id, 0.0)
-                            < user_assigned_hours.get(best_manager_assignment[1], 0.0)
-                        )
-                    ):
-                        best_manager_assignment = (
-                            shift_id,
-                            user_id,
-                            duration_hours,
-                            manager_coverage_gain,
-                            day,
-                        )
+    for day in range(7):
+        for hour in range(business_start_hour, business_end_hour):
+            staff_covering_vars = []
+            manager_covering_vars = []
+            for shift in shifts_by_day[day]:
+                if not (shift.start_hour <= hour < shift.end_hour):
+                    continue
+                shift_index = shift_ids[id(shift)]
+                for user_id in shift.staff:
+                    var = assignment_vars[(user_id, shift_index)]
+                    staff_covering_vars.append(var)
+                    if is_manager(user_id):
+                        manager_covering_vars.append(var)
 
-        if best_manager_assignment is None:
-            break
-
-        shift_id, user_id, _, _, _ = best_manager_assignment
-        apply_assignment(user_id, shift_id)
-
-    while True:
-        best_assignment: Tuple[int, int, float, int, int] | None = None
-
-        for day, ordered_shifts in ordered_shifts_by_day.items():
-            hourly_assigned_staff = hourly_assigned_staff_by_day[day]
-            for shift in ordered_shifts:
-                shift_id = id(shift)
-                duration_hours = shift_duration_hours(shift)
-                sorted_candidates = sorted(
-                    available_candidates_by_shift[shift_id],
-                    key=lambda user_id: (
-                        projected_consecutive_run(user_id, day),
-                        user_assigned_shift_counts.get(user_id, 0),
-                        -max(
-                            0.0,
-                            user_hour_limits.get(user_id, (0.0, float("inf")))[0]
-                            - user_assigned_hours.get(user_id, 0.0),
-                        ),
-                        -(
-                            user_hour_limits.get(user_id, (0.0, float("inf")))[1]
-                            - user_assigned_hours.get(user_id, 0.0)
-                        ),
-                        user_assigned_hours.get(user_id, 0.0),
-                        user_id,
-                    ),
+            if len(staff_covering_vars) < min_staff_per_shift:
+                raise RosterGenerationError(
+                    code="staff_coverage_unmet",
+                    message="Roster generation failed: minimum staff coverage could not be met.",
+                    explanation="At least one open hour has too few feasible staff candidates before optimization starts.",
+                    suggestions=[
+                        "Collect more availability for the uncovered period.",
+                        "Reduce minimum staff per shift if service levels allow.",
+                    ],
+                    context={
+                        "day_of_week": day,
+                        "hour": hour,
+                        "required_staff": min_staff_per_shift,
+                        "available_candidates": len(staff_covering_vars),
+                    },
                 )
 
-                for user_id in sorted_candidates:
-                    if not can_assign_user_to_shift(user_id, shift_id):
-                        continue
+            if len(manager_covering_vars) < min_managers_per_hour:
+                raise RosterGenerationError(
+                    code="manager_coverage_unmet",
+                    message="Roster generation failed: manager coverage target could not be met.",
+                    explanation="At least one open hour has too few feasible manager candidates before optimization starts.",
+                    suggestions=[
+                        "Increase manager availability for the uncovered period.",
+                        "Lower the minimum managers per hour setting if operationally safe.",
+                    ],
+                    context={
+                        "day_of_week": day,
+                        "hour": hour,
+                        "required_managers_per_hour": min_managers_per_hour,
+                        "available_manager_candidates": len(manager_covering_vars),
+                    },
+                )
 
-                    coverage_gain = sum(
-                        1
-                        for hour in range(shift.start_hour, shift.end_hour)
-                        if hourly_assigned_staff[hour] < min_staff_per_shift
-                    )
-                    if coverage_gain <= 0:
-                        continue
+            model.Add(sum(staff_covering_vars) >= min_staff_per_shift)
+            model.Add(sum(manager_covering_vars) >= min_managers_per_hour)
 
-                    if (
-                        best_assignment is None
-                        or coverage_gain > best_assignment[3]
-                        or (
-                            coverage_gain == best_assignment[3]
-                            and duration_hours > best_assignment[2]
-                        )
-                        or (
-                            coverage_gain == best_assignment[3]
-                            and duration_hours == best_assignment[2]
-                            and projected_consecutive_run(user_id, day)
-                            < projected_consecutive_run(best_assignment[1], best_assignment[4])
-                        )
-                        or (
-                            coverage_gain == best_assignment[3]
-                            and duration_hours == best_assignment[2]
-                            and projected_consecutive_run(user_id, day)
-                            == projected_consecutive_run(best_assignment[1], best_assignment[4])
-                            and user_assigned_shift_counts.get(user_id, 0)
-                            < user_assigned_shift_counts.get(best_assignment[1], 0)
-                        )
-                        or (
-                            coverage_gain == best_assignment[3]
-                            and duration_hours == best_assignment[2]
-                            and user_assigned_hours.get(user_id, 0.0)
-                            < user_assigned_hours.get(best_assignment[1], 0.0)
-                        )
-                    ):
-                        best_assignment = (shift_id, user_id, duration_hours, coverage_gain, day)
+    total_assigned_minutes = sum(
+        shift_duration_minutes(all_shifts[shift_index]) * var
+        for (_, shift_index), var in assignment_vars.items()
+    )
+    total_assignments = sum(assignment_vars.values())
+    model.Minimize(total_assigned_minutes * 1000 + total_assignments)
 
-        if best_assignment is None:
-            break
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = SOLVER_TIME_LIMIT_SECONDS
+    solver.parameters.num_search_workers = 8
 
-        shift_id, user_id, _, _, _ = best_assignment
-        apply_assignment(user_id, shift_id)
+    status = solver.Solve(model)
+    if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        raise RosterGenerationError(
+            code="constraint_model_infeasible",
+            message="Roster generation failed: no assignment satisfies the current constraints.",
+            explanation="The constraint solver could not find a feasible roster that meets coverage, rest, and weekly user limits together.",
+            suggestions=[
+                "Relax minimum staffing or manager coverage requirements.",
+                "Reduce minimum hour or shift requirements for some users.",
+                "Relax minimum rest-gap or consecutive-shift settings.",
+            ],
+        )
 
-    while True:
-        users_below_min_shifts = [
+    assigned_shifts: Dict[int, List[Shift]] = {day: [] for day in range(7)}
+    for shift in all_shifts:
+        shift_index = shift_ids[id(shift)]
+        final_staff = [
             user_id
-            for user_id, (min_shifts, _) in user_shift_limits.items()
-            if user_assigned_shift_counts.get(user_id, 0) < min_shifts
+            for user_id in sorted(set(shift.staff))
+            if solver.Value(assignment_vars[(user_id, shift_index)]) == 1
         ]
-        if not users_below_min_shifts:
-            break
-
-        progress = False
-        users_below_min_shifts.sort(
-            key=lambda user_id: (
-                -(user_shift_limits[user_id][0] - user_assigned_shift_counts.get(user_id, 0)),
-                user_assigned_shift_counts.get(user_id, 0),
-                user_id,
-            )
-        )
-
-        for user_id in users_below_min_shifts:
-            min_shifts, _ = user_shift_limits[user_id]
-            remaining_shifts = min_shifts - user_assigned_shift_counts.get(user_id, 0)
-            if remaining_shifts <= 0:
-                continue
-
-            best_shift_id: int | None = None
-            best_score: Tuple[int, float, int] | None = None
-
-            for day, ordered_shifts in ordered_shifts_by_day.items():
-                for shift in ordered_shifts:
-                    shift_id = id(shift)
-                    if user_id not in available_candidates_by_shift[shift_id]:
-                        continue
-                    if not can_assign_user_to_shift(user_id, shift_id):
-                        continue
-
-                    duration_hours = shift_duration_hours(shift)
-                    coverage_gain = sum(
-                        1
-                        for hour in range(shift.start_hour, shift.end_hour)
-                        if hourly_assigned_staff_by_day[day][hour] < min_staff_per_shift
-                    )
-                    score = (
-                        -coverage_gain,
-                        -duration_hours,
-                        day,
-                    )
-                    if best_score is None or score < best_score:
-                        best_score = score
-                        best_shift_id = shift_id
-
-            if best_shift_id is not None:
-                apply_assignment(user_id, best_shift_id)
-                progress = True
-
-        if not progress:
-            break
-
-    while True:
-        users_below_min = [
-            user_id
-            for user_id, (min_hours, _) in user_hour_limits.items()
-            if user_assigned_hours.get(user_id, 0.0) < min_hours
-        ]
-        if not users_below_min:
-            break
-
-        progress = False
-        users_below_min.sort(
-            key=lambda user_id: (
-                -(
-                    user_hour_limits[user_id][0]
-                    - user_assigned_hours.get(user_id, 0.0)
-                ),
-                user_assigned_hours.get(user_id, 0.0),
-                user_id,
-            )
-        )
-
-        for user_id in users_below_min:
-            min_hours, _ = user_hour_limits[user_id]
-            remaining_hours = min_hours - user_assigned_hours.get(user_id, 0.0)
-            if remaining_hours <= 0:
-                continue
-
-            best_shift_id: int | None = None
-            best_score: Tuple[float, float, int] | None = None
-
-            for day, ordered_shifts in ordered_shifts_by_day.items():
-                for shift in ordered_shifts:
-                    shift_id = id(shift)
-                    if user_id not in available_candidates_by_shift[shift_id]:
-                        continue
-                    if not can_assign_user_to_shift(user_id, shift_id):
-                        continue
-
-                    duration_hours = shift_duration_hours(shift)
-                    overshoot = max(0.0, duration_hours - remaining_hours)
-                    score = (
-                        overshoot,
-                        -duration_hours,
-                        day,
-                    )
-                    if best_score is None or score < best_score:
-                        best_score = score
-                        best_shift_id = shift_id
-
-            if best_shift_id is not None:
-                apply_assignment(user_id, best_shift_id)
-                progress = True
-
-        if not progress:
-            break
-
-    uncovered_manager_hours: List[Tuple[int, int]] = []
-    for day in range(7):
-        for hour in range(business_start_hour, business_end_hour):
-            if hourly_assigned_managers_by_day[day][hour] < min_managers_per_hour:
-                uncovered_manager_hours.append((day, hour))
-    if uncovered_manager_hours:
-        first_uncovered_day, first_uncovered_hour = uncovered_manager_hours[0]
-        raise RosterGenerationError(
-            code="manager_coverage_unmet",
-            message="Roster generation failed: manager coverage target could not be met.",
-            explanation=(
-                "At least one open hour has fewer managers assigned than required."
-            ),
-            suggestions=[
-                "Increase manager availability for the uncovered period.",
-                "Lower the minimum managers per hour setting if operationally safe.",
-                "Relax rest-gap or consecutive-shift rules if they are too restrictive.",
-            ],
-            context={
-                "day_of_week": first_uncovered_day,
-                "hour": first_uncovered_hour,
-                "required_managers_per_hour": min_managers_per_hour,
-            },
-        )
-
-    uncovered_staff_hours: List[Tuple[int, int]] = []
-    for day in range(7):
-        for hour in range(business_start_hour, business_end_hour):
-            if hourly_assigned_staff_by_day[day][hour] < min_staff_per_shift:
-                uncovered_staff_hours.append((day, hour))
-    if uncovered_staff_hours:
-        first_uncovered_day, first_uncovered_hour = uncovered_staff_hours[0]
-        assigned_count = hourly_assigned_staff_by_day[first_uncovered_day][first_uncovered_hour]
-        raise RosterGenerationError(
-            code="staff_coverage_unmet",
-            message="Roster generation failed: minimum staff coverage could not be met.",
-            explanation=(
-                "At least one open hour has fewer assigned team members than required."
-            ),
-            suggestions=[
-                "Collect more availability for the uncovered period.",
-                "Reduce minimum staff per shift if service levels allow.",
-                "Review max-hours and max-shifts limits for key users.",
-            ],
-            context={
-                "day_of_week": first_uncovered_day,
-                "hour": first_uncovered_hour,
-                "assigned_staff": assigned_count,
-                "required_staff": min_staff_per_shift,
-            },
-        )
-
-    users_below_min_shifts = [
-        (
-            user_id,
-            user_assigned_shift_counts.get(user_id, 0),
-            min_shifts,
-        )
-        for user_id, (min_shifts, _) in user_shift_limits.items()
-        if user_assigned_shift_counts.get(user_id, 0) < min_shifts
-    ]
-    if users_below_min_shifts:
-        user_id, assigned_shifts, required_shifts = users_below_min_shifts[0]
-        raise RosterGenerationError(
-            code="min_shifts_unmet",
-            message="Roster generation failed: one or more users did not reach minimum weekly shifts.",
-            explanation=(
-                "The scheduler could not satisfy minimum weekly shift targets while respecting all constraints."
-            ),
-            suggestions=[
-                "Lower minimum shifts for affected users.",
-                "Increase those users' availability windows.",
-                "Relax constraints such as rest gaps or consecutive-shift limits.",
-            ],
-            context={
-                "user_id": user_id,
-                "assigned_shifts": assigned_shifts,
-                "required_shifts": required_shifts,
-            },
-        )
+        if not final_staff:
+            continue
+        shift.staff = final_staff
+        assigned_shifts[shift.day_of_week].append(shift)
 
     existing_shift_ids = [
         shift_id
@@ -641,53 +418,29 @@ def assign_staff_to_shifts(
     ).delete(synchronize_session=False)
     db.commit()
 
-    for day, ordered_shifts in ordered_shifts_by_day.items():
-        for shift in ordered_shifts:
-            final_staff = assigned_staff_by_shift[id(shift)]
-            if not final_staff:
-                continue
-
-            shift.staff = final_staff
-            assigned_shifts[day].append(shift)
-
-            db_shift = (
-                db.query(ShiftDB)
-                .filter_by(
-                    workplace_id=workplace_id,
-                    week_start_date=week_start_date,
-                    day_of_week=shift.day_of_week,
-                    start_time=shift.start_time,
-                    end_time=shift.end_time,
-                )
-                .first()
+    for day in range(7):
+        for shift in assigned_shifts[day]:
+            db_shift = ShiftDB(
+                workplace_id=workplace_id,
+                week_start_date=week_start_date,
+                day_of_week=shift.day_of_week,
+                start_time=shift.start_time,
+                end_time=shift.end_time,
             )
-            if not db_shift:
-                db_shift = ShiftDB(
-                    workplace_id=workplace_id,
-                    week_start_date=week_start_date,
-                    day_of_week=shift.day_of_week,
-                    start_time=shift.start_time,
-                    end_time=shift.end_time,
-                )
-                db.add(db_shift)
-                db.commit()
-                db.refresh(db_shift)
+            db.add(db_shift)
+            db.commit()
+            db.refresh(db_shift)
 
-            for uid in shift.staff:
-                exists = (
-                    db.query(ShiftAssignmentDB)
-                    .filter_by(shift_id=db_shift.id, user_id=uid, workplace_id=workplace_id)
-                    .first()
-                )
-                if not exists:
-                    db_assignment = ShiftAssignmentDB(
+            for user_id in shift.staff:
+                db.add(
+                    ShiftAssignmentDB(
                         shift_id=db_shift.id,
-                        user_id=uid,
+                        user_id=user_id,
                         workplace_id=workplace_id,
                     )
-                    db.add(db_assignment)
+                )
             db.commit()
 
-        assigned_shifts[day].sort(key=lambda shift: (shift.start_time, shift.end_time))
+        assigned_shifts[day].sort(key=lambda item: (item.start_time, item.end_time))
 
     return assigned_shifts
