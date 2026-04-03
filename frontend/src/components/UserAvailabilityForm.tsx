@@ -646,6 +646,9 @@ export default function UserAvailabilityForm() {
             <section className="availability-form__availability">
               <div className="availability-form__availability-head">
                 <h3>Weekly Availability</h3>
+                <p>
+                  Workplace hours: {businessHours.start} to {businessHours.end}. "Fully Available" uses this full window.
+                </p>
               </div>
 
               <div className="availability-form__week-grid">
