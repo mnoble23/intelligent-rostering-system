@@ -353,6 +353,30 @@ def test_workplace_constraints_can_be_read_and_updated_by_manager():
     assert put_response.json()["allowed_shift_lengths"] == "5,8"
 
 
+def test_workplace_business_hours_are_available_to_staff_for_their_own_workplace():
+    client, SessionLocal = _build_test_client()
+
+    with SessionLocal() as session:
+        seeded = _seed_two_workplaces(session)
+        seeded["workplace_a"].business_start_hour = 8
+        seeded["workplace_a"].business_end_hour = 20
+        seeded["workplace_b"].business_start_hour = 10
+        seeded["workplace_b"].business_end_hour = 18
+        session.commit()
+
+    staff_a_token = _login(client, "staff_a", "StaffA123!")
+
+    response = client.get(
+        "/workplace/business-hours",
+        headers={"Authorization": f"Bearer {staff_a_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["business_start_hour"] == 8
+    assert response.json()["business_end_hour"] == 20
+    assert response.json()["workplace_id"] == seeded["workplace_a"].id
+
+
 def test_workplace_constraints_reject_invalid_manager_requirements():
     client, SessionLocal = _build_test_client()
 

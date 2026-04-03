@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.auth import require_manager
+from app.api.auth import get_current_user, require_manager
 from app.db.session import get_db
 from app.models.user_db import UserDB
 from app.models.workplace_db import WorkplaceDB
@@ -25,6 +25,12 @@ class WorkplaceConstraintsResponse(BaseModel):
     allowed_shift_lengths: str
 
 
+class WorkplaceBusinessHoursResponse(BaseModel):
+    workplace_id: int
+    business_start_hour: int = Field(ge=0, le=23)
+    business_end_hour: int = Field(ge=1, le=24)
+
+
 class UpdateWorkplaceConstraintsRequest(BaseModel):
     min_staff_per_shift: int = Field(ge=1, le=20)
     min_managers_per_hour: int = Field(ge=0, le=10)
@@ -33,6 +39,22 @@ class UpdateWorkplaceConstraintsRequest(BaseModel):
     business_start_hour: int = Field(ge=0, le=23)
     business_end_hour: int = Field(ge=1, le=24)
     allowed_shift_lengths: str = "4,6,9"
+
+
+@router.get("/business-hours", response_model=WorkplaceBusinessHoursResponse)
+def get_workplace_business_hours(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+):
+    workplace = db.query(WorkplaceDB).filter_by(id=current_user.workplace_id).first()
+    if not workplace:
+        raise HTTPException(status_code=404, detail="Workplace not found")
+
+    return {
+        "workplace_id": workplace.id,
+        "business_start_hour": workplace.business_start_hour,
+        "business_end_hour": workplace.business_end_hour,
+    }
 
 
 @router.get("/constraints", response_model=WorkplaceConstraintsResponse)

@@ -26,6 +26,12 @@ interface ManagerUser {
   max_shifts_per_week: number;
 }
 
+interface WorkplaceBusinessHours {
+  workplace_id: number;
+  business_start_hour: number;
+  business_end_hour: number;
+}
+
 type ManagerMode = "new" | "existing";
 type DayMode = "unavailable" | "full" | "custom";
 
@@ -41,8 +47,8 @@ interface DayPlan {
 }
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const BUSINESS_OPEN = "06:00";
-const BUSINESS_CLOSE = "22:00";
+const DEFAULT_BUSINESS_OPEN = "06:00";
+const DEFAULT_BUSINESS_CLOSE = "22:00";
 
 function toHHMM(value: string) {
   const [hour = "00", minute = "00"] = value.split(":");
@@ -62,7 +68,15 @@ function buildEmptyDayPlans(): DayPlan[] {
   }));
 }
 
-function mapApiAvailabilityToDayPlans(rows: AvailabilityApiRow[]): DayPlan[] {
+function hourToHHMM(value: number) {
+  return `${String(value).padStart(2, "0")}:00`;
+}
+
+function mapApiAvailabilityToDayPlans(
+  rows: AvailabilityApiRow[],
+  businessOpen: string,
+  businessClose: string
+): DayPlan[] {
   const grouped = new Map<number, TimeBlock[]>();
   for (const row of rows) {
     const list = grouped.get(row.day_of_week) ?? [];
@@ -85,8 +99,8 @@ function mapApiAvailabilityToDayPlans(rows: AvailabilityApiRow[]): DayPlan[] {
 
     const isFullDayOnly =
       blocks.length === 1 &&
-      blocks[0].start_time === BUSINESS_OPEN &&
-      blocks[0].end_time === BUSINESS_CLOSE;
+      blocks[0].start_time === businessOpen &&
+      blocks[0].end_time === businessClose;
 
     if (isFullDayOnly) {
       return {
@@ -119,6 +133,10 @@ export default function UserAvailabilityForm() {
   const [existingUserSearch, setExistingUserSearch] = useState("");
   const [isExistingUserMenuOpen, setIsExistingUserMenuOpen] = useState(false);
   const [availabilityRows, setAvailabilityRows] = useState<AvailabilityApiRow[]>([]);
+  const [businessHours, setBusinessHours] = useState({
+    start: DEFAULT_BUSINESS_OPEN,
+    end: DEFAULT_BUSINESS_CLOSE,
+  });
 
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState("");
@@ -127,14 +145,28 @@ export default function UserAvailabilityForm() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const meResponse = await API.get<AuthUser>("/auth/me");
+        const [meResponse, businessHoursResponse] = await Promise.all([
+          API.get<AuthUser>("/auth/me"),
+          API.get<WorkplaceBusinessHours>("/workplace/business-hours"),
+        ]);
         setAuthUser(meResponse.data);
+        const resolvedBusinessHours = {
+          start: hourToHHMM(businessHoursResponse.data.business_start_hour),
+          end: hourToHHMM(businessHoursResponse.data.business_end_hour),
+        };
+        setBusinessHours(resolvedBusinessHours);
 
         if (meResponse.data.role === "staff") {
           setName(meResponse.data.name);
           setRole("staff");
           const availabilityResponse = await API.get<AvailabilityApiRow[]>("/availability");
-          setDayPlans(mapApiAvailabilityToDayPlans(availabilityResponse.data ?? []));
+          setDayPlans(
+            mapApiAvailabilityToDayPlans(
+              availabilityResponse.data ?? [],
+              resolvedBusinessHours.start,
+              resolvedBusinessHours.end
+            )
+          );
           return;
         }
 
@@ -194,8 +226,8 @@ export default function UserAvailabilityForm() {
     setMaxShiftsPerWeek(selectedUser.max_shifts_per_week);
 
     const selectedAvailability = availabilityRows.filter(row => row.user_id === selectedUser.id);
-    setDayPlans(mapApiAvailabilityToDayPlans(selectedAvailability));
-  }, [authUser?.role, managerMode, selectedExistingUserId, managerUsers, availabilityRows]);
+    setDayPlans(mapApiAvailabilityToDayPlans(selectedAvailability, businessHours.start, businessHours.end));
+  }, [authUser?.role, managerMode, selectedExistingUserId, managerUsers, availabilityRows, businessHours]);
 
   const updateDayMode = (dayIndex: number, mode: DayMode) => {
     setDayPlans(prev =>
@@ -205,7 +237,7 @@ export default function UserAvailabilityForm() {
           return {
             ...plan,
             mode,
-            blocks: [{ start_time: BUSINESS_OPEN, end_time: BUSINESS_CLOSE }],
+            blocks: [{ start_time: businessHours.start, end_time: businessHours.end }],
           };
         }
         if (mode === "unavailable") {
@@ -313,8 +345,8 @@ export default function UserAvailabilityForm() {
         payloadAvailability.push({
           user_id: 0,
           day_of_week: plan.day_of_week,
-          start_time: `${BUSINESS_OPEN}:00`,
-          end_time: `${BUSINESS_CLOSE}:00`,
+          start_time: `${businessHours.start}:00`,
+          end_time: `${businessHours.end}:00`,
         });
         continue;
       }
@@ -427,7 +459,13 @@ export default function UserAvailabilityForm() {
         }
       } else {
         const availabilityResponse = await API.get<AvailabilityApiRow[]>("/availability");
-        setDayPlans(mapApiAvailabilityToDayPlans(availabilityResponse.data ?? []));
+        setDayPlans(
+          mapApiAvailabilityToDayPlans(
+            availabilityResponse.data ?? [],
+            businessHours.start,
+            businessHours.end
+          )
+        );
       }
     } catch (err: unknown) {
       console.error(err);
