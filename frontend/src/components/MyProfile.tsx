@@ -36,6 +36,7 @@ interface Shift {
 interface AuthUser {
   id: number;
   name: string;
+  role: "manager" | "staff";
 }
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -70,6 +71,7 @@ export default function MyProfile({ weekStartDate }: MyProfileProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<number | "">("");
   const [userSearch, setUserSearch] = useState("");
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -89,6 +91,7 @@ export default function MyProfile({ weekStartDate }: MyProfileProps) {
         setUsers(sortedUsers);
         setAvailability(availabilityRes.data);
         setShifts(rosterRes.data);
+        setAuthUser(meRes.data);
         setSelectedUserId(meRes.data.id);
         setUserSearch(meRes.data.name);
       } catch (err) {
@@ -141,6 +144,8 @@ export default function MyProfile({ weekStartDate }: MyProfileProps) {
     return matches;
   }, [users, userSearch]);
 
+  const isManager = authUser?.role === "manager";
+
   return (
     <section className="my-profile">
       <div className="my-profile__shell">
@@ -152,47 +157,49 @@ export default function MyProfile({ weekStartDate }: MyProfileProps) {
 
         {status && <p className="my-profile__status">{status}</p>}
 
-        <div className="my-profile__controls">
-          <label className="my-profile__field">
-            <span>User (Search)</span>
-            <div className="my-profile__user-picker">
-              <input
-                type="text"
-                value={userSearch}
-                placeholder="Type a name..."
-                onChange={e => {
-                  setUserSearch(e.target.value);
-                  setIsUserMenuOpen(true);
-                }}
-                onFocus={() => setIsUserMenuOpen(true)}
-                onBlur={() => window.setTimeout(() => setIsUserMenuOpen(false), 120)}
-                disabled={users.length === 0}
-              />
-              {isUserMenuOpen && users.length > 0 && (
-                <div className="my-profile__user-menu">
-                  {filteredUsers.length === 0 ? (
-                    <div className="my-profile__user-item my-profile__user-item--empty">No matches</div>
-                  ) : (
-                    filteredUsers.map(user => (
-                      <button
-                        key={user.id}
-                        type="button"
-                        className={`my-profile__user-item${selectedUserId === user.id ? " my-profile__user-item--active" : ""}`}
-                        onMouseDown={() => {
-                          setSelectedUserId(user.id);
-                          setUserSearch(user.name);
-                          setIsUserMenuOpen(false);
-                        }}
-                      >
-                        {user.name}
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          </label>
-        </div>
+        {isManager && (
+          <div className="my-profile__controls">
+            <label className="my-profile__field">
+              <span>User (Search)</span>
+              <div className="my-profile__user-picker">
+                <input
+                  type="text"
+                  value={userSearch}
+                  placeholder="Type a name..."
+                  onChange={e => {
+                    setUserSearch(e.target.value);
+                    setIsUserMenuOpen(true);
+                  }}
+                  onFocus={() => setIsUserMenuOpen(true)}
+                  onBlur={() => window.setTimeout(() => setIsUserMenuOpen(false), 120)}
+                  disabled={users.length === 0}
+                />
+                {isUserMenuOpen && users.length > 0 && (
+                  <div className="my-profile__user-menu">
+                    {filteredUsers.length === 0 ? (
+                      <div className="my-profile__user-item my-profile__user-item--empty">No matches</div>
+                    ) : (
+                      filteredUsers.map(user => (
+                        <button
+                          key={user.id}
+                          type="button"
+                          className={`my-profile__user-item${selectedUserId === user.id ? " my-profile__user-item--active" : ""}`}
+                          onMouseDown={() => {
+                            setSelectedUserId(user.id);
+                            setUserSearch(user.name);
+                            setIsUserMenuOpen(false);
+                          }}
+                        >
+                          {user.name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </label>
+          </div>
+        )}
 
         {selectedUserId === "" ? (
           <p className="my-profile__empty">
