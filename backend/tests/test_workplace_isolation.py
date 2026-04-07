@@ -353,6 +353,33 @@ def test_workplace_constraints_can_be_read_and_updated_by_manager():
     assert put_response.json()["allowed_shift_lengths"] == "5,8"
 
 
+def test_roster_debug_shifts_use_workplace_allowed_shift_lengths():
+    client, SessionLocal = _build_test_client()
+
+    with SessionLocal() as session:
+        _seed_two_workplaces(session)
+        workplace_a = session.query(WorkplaceDB).filter_by(name="Workplace A").first()
+        assert workplace_a is not None
+        workplace_a.business_start_hour = 9
+        workplace_a.business_end_hour = 17
+        workplace_a.allowed_shift_lengths = "5,8"
+        session.commit()
+
+    manager_a_token = _login(client, "manager_a", "ManagerA123!")
+
+    response = client.get(
+        "/roster/debug/shifts",
+        headers={"Authorization": f"Bearer {manager_a_token}"},
+    )
+
+    assert response.status_code == 200
+    monday_shifts = response.json()["0"]
+    assert "09:00:00-14:00:00" in monday_shifts
+    assert "09:00:00-17:00:00" in monday_shifts
+    assert "09:00:00-13:00:00" not in monday_shifts
+    assert "09:00:00-15:00:00" not in monday_shifts
+
+
 def test_workplace_business_hours_are_available_to_staff_for_their_own_workplace():
     client, SessionLocal = _build_test_client()
 
@@ -375,6 +402,31 @@ def test_workplace_business_hours_are_available_to_staff_for_their_own_workplace
     assert response.json()["business_start_hour"] == 8
     assert response.json()["business_end_hour"] == 20
     assert response.json()["workplace_id"] == seeded["workplace_a"].id
+
+
+def test_roster_coverage_uses_workplace_constraints_without_error():
+    client, SessionLocal = _build_test_client()
+
+    with SessionLocal() as session:
+        _seed_two_workplaces(session)
+        workplace_a = session.query(WorkplaceDB).filter_by(name="Workplace A").first()
+        assert workplace_a is not None
+        workplace_a.business_start_hour = 8
+        workplace_a.business_end_hour = 12
+        workplace_a.allowed_shift_lengths = "4"
+        session.commit()
+
+    manager_a_token = _login(client, "manager_a", "ManagerA123!")
+
+    response = client.get(
+        "/roster/coverage",
+        headers={"Authorization": f"Bearer {manager_a_token}"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["business_hours"] == {"start": "08:00", "end": "12:00"}
+    assert payload["week_start_date"] is None
 
 
 def test_workplace_constraints_reject_invalid_manager_requirements():

@@ -443,6 +443,7 @@ def get_shift_coverage(
         _,
         business_start_hour,
         business_end_hour,
+        _,
     ) = get_workplace_constraints(db, current_user.workplace_id)
     resolved_week_start = resolve_week_start(db, current_user.workplace_id, week_start_date)
     if resolved_week_start is None:
